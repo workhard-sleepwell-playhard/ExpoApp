@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // DEVELOPMENT RULES - COMPLETELY OPEN ACCESS
+    // No security restrictions for development phase
+    // TODO: Enable proper security rules before production deployment
+    
+    // Allow all operations on all documents
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

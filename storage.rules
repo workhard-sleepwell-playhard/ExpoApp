@@ -1,0 +1,38 @@
+rules_version = '2';
+
+// Craft rules based on data in your Firestore database
+// allow write: if firestore.get(
+//    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
+service firebase.storage {
+  match /b/{bucket}/o {
+    // User profile images
+    match /users/{userId}/profile/{fileName} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Post media files
+    match /posts/{postId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        firestore.get(/databases/(default)/documents/posts/$(postId)).data.userId == request.auth.uid;
+    }
+    
+    // Achievement badges
+    match /achievements/{achievementId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
+    // Task attachments
+    match /tasks/{taskId}/attachments/{fileName} {
+      allow read, write: if request.auth != null && 
+        firestore.get(/databases/(default)/documents/tasks/$(taskId)).data.userId == request.auth.uid;
+    }
+    
+    // Public assets (app icons, default images)
+    match /public/{fileName} {
+      allow read: if true; // Public read access
+      allow write: if false; // Only admins can upload public assets
+    }
+  }
+}
