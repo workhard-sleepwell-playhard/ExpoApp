@@ -1,134 +1,90 @@
 import React from 'react';
-import { StyleSheet, ScrollView, View, Dimensions, TouchableOpacity, Animated } from 'react-native';
+import { StyleSheet, ScrollView, View, TouchableOpacity, Animated, Dimensions } from 'react-native';
+import { useSelector, useDispatch } from 'react-redux';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 
-// Dummy data for tracking
-const trackingData = [
-  { id: 1, category: 'Work', hours: 8.5, color: '#FF3B30', icon: 'briefcase.fill' },
-  { id: 2, category: 'Exercise', hours: 1.5, color: '#34C759', icon: 'figure.run' },
-  { id: 3, category: 'Learning', hours: 2.0, color: '#007AFF', icon: 'book.fill' },
-  { id: 4, category: 'Personal', hours: 3.0, color: '#FF9500', icon: 'person.fill' },
-];
+// Import Redux selectors and actions
+import { 
+  selectTrackingData, 
+  selectWeeklyProgress, 
+  selectTaskCompletionData, 
+  selectDailyPointsData, 
+  selectCurrentSlide, 
+  selectTimePeriod, 
+  selectShowCustomDatePicker, 
+  selectCustomDateFrom, 
+  selectCustomDateTo,
+  selectSlides,
+  selectCurrentSlideData,
+  selectMaxHours,
+  selectTrackingStats,
+  selectTotalTasks,
+  selectMaxPoints,
+  selectTotalPoints,
+  selectTimePeriodLabel,
+  selectTimePeriodIcon
+} from '../../store/tracking/tracking.selector';
+import { 
+  handleNextSlide, 
+  handlePrevSlide, 
+  handleNavigateTimePeriod, 
+  handleCustomDateClick, 
+  handleCloseCustomDatePicker, 
+  handleApplyCustomDateRange,
+  setTimePeriodDirectly
+} from '../../store/tracking/tracking.action';
 
-const weeklyProgress = [
-  { day: 'Mon', hours: 6.5 },
-  { day: 'Tue', hours: 8.0 },
-  { day: 'Wed', hours: 7.5 },
-  { day: 'Thu', hours: 9.0 },
-  { day: 'Fri', hours: 8.5 },
-  { day: 'Sat', hours: 4.0 },
-  { day: 'Sun', hours: 2.5 },
-];
+// Import new components
+import { TrackingHeader } from '../../components/tabscomponents/tracking/trackingHeader.component';
+import { SummaryCard } from '../../components/tabscomponents/tracking/trackingSummaryCard.component';
+import { TimePeriodSelector } from '../../components/tabscomponents/tracking/trackingTimePeriodSelector.component';
 
-// Task completion data for pie chart
-const taskCompletionData = [
-  { id: 1, category: 'Completed', count: 12, color: '#4CAF50', percentage: 75 },
-  { id: 2, category: 'Pending', count: 4, color: '#FF5722', percentage: 25 },
-];
-
-// Daily points tracking data
-const dailyPointsData = [
-  { time: '6:00 AM', points: 0, activity: 'Start of day' },
-  { time: '8:00 AM', points: 15, activity: 'Morning workout' },
-  { time: '10:00 AM', points: 25, activity: 'Work task 1' },
-  { time: '12:00 PM', points: 40, activity: 'Lunch break' },
-  { time: '2:00 PM', points: 60, activity: 'Work task 2' },
-  { time: '4:00 PM', points: 75, activity: 'Work task 3' },
-  { time: '6:00 PM', points: 85, activity: 'Evening routine' },
-  { time: '8:00 PM', points: 95, activity: 'Study session' },
-  { time: '10:00 PM', points: 105, activity: 'Daily review' },
-];
+const { height: screenHeight } = Dimensions.get('window');
 
 const screenWidth = Dimensions.get('window').width;
 
 export default function TrackingScreen() {
+  const dispatch = useDispatch();
   const colorScheme = useColorScheme();
-  const [currentSlide, setCurrentSlide] = React.useState(0);
-  const [timePeriod, setTimePeriod] = React.useState<'week' | 'month' | 'year' | 'all-time'>('week');
-  const [showCustomDatePicker, setShowCustomDatePicker] = React.useState(false);
-  const maxHours = Math.max(...weeklyProgress.map(p => p.hours));
-
-  const timePeriodOptions = [
-    { label: 'Week', value: 'week', icon: '📅' },
-    { label: 'Month', value: 'month', icon: '🗓️' },
-    { label: 'Year', value: 'year', icon: '📆' },
-    { label: 'All Time', value: 'all-time', icon: '∞' },
-    { label: 'Custom', value: 'custom', icon: '⚙️' },
-  ];
-
-  const getTimePeriodLabel = () => {
-    return timePeriodOptions.find(option => option.value === timePeriod)?.label || 'Week';
-  };
-
-  const getTimePeriodIcon = () => {
-    return timePeriodOptions.find(option => option.value === timePeriod)?.icon || '📅';
-  };
-
-  const timePeriods: ('week' | 'month' | 'year' | 'all-time')[] = ['week', 'month', 'year', 'all-time'];
+  
+  // Redux state
+  const trackingData = useSelector(selectTrackingData);
+  const weeklyProgress = useSelector(selectWeeklyProgress);
+  const taskCompletionData = useSelector(selectTaskCompletionData);
+  const dailyPointsData = useSelector(selectDailyPointsData);
+  const currentSlide = useSelector(selectCurrentSlide);
+  const timePeriod = useSelector(selectTimePeriod);
+  const showCustomDatePicker = useSelector(selectShowCustomDatePicker);
+  const customDateFrom = useSelector(selectCustomDateFrom);
+  const customDateTo = useSelector(selectCustomDateTo);
+  const slides = useSelector(selectSlides);
+  const currentSlideData = useSelector(selectCurrentSlideData);
+  const maxHours = useSelector(selectMaxHours);
+  const trackingStats = useSelector(selectTrackingStats);
+  const totalTasks = useSelector(selectTotalTasks);
+  const maxPoints = useSelector(selectMaxPoints);
+  const totalPoints = useSelector(selectTotalPoints);
+  const timePeriodLabel = useSelector(selectTimePeriodLabel);
+  const timePeriodIcon = useSelector(selectTimePeriodIcon);
 
   const navigateTimePeriod = (direction: 'prev' | 'next') => {
-    const currentIndex = timePeriods.indexOf(timePeriod);
-    let newIndex;
-    
-    if (direction === 'prev') {
-      newIndex = currentIndex > 0 ? currentIndex - 1 : timePeriods.length - 1;
-    } else {
-      newIndex = currentIndex < timePeriods.length - 1 ? currentIndex + 1 : 0;
-    }
-    
-    const newPeriod = timePeriods[newIndex];
-    setTimePeriod(newPeriod);
-    
-    console.log(`Time period changed to: ${newPeriod}`);
+    dispatch(handleNavigateTimePeriod(direction));
   };
 
   const handleCustomDateClick = () => {
-    setShowCustomDatePicker(true);
+    dispatch(handleCustomDateClick());
   };
-
-  const getChartTitle = () => {
-    const baseTitles = ['Progress', 'Task Completion', 'Points'];
-    const timeLabels = {
-      'week': 'Weekly',
-      'month': 'Monthly', 
-      'year': 'Yearly',
-      'all-time': 'All-Time'
-    };
-    
-    return `${timeLabels[timePeriod]} ${baseTitles[currentSlide]}`;
-  };
-
-  const slides = [
-    {
-      id: 0,
-      title: getChartTitle(),
-      type: 'bar',
-      data: weeklyProgress
-    },
-    {
-      id: 1,
-      title: getChartTitle(),
-      type: 'pie',
-      data: taskCompletionData
-    },
-    {
-      id: 2,
-      title: getChartTitle(),
-      type: 'line',
-      data: dailyPointsData
-    }
-  ];
 
   const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % slides.length);
+    dispatch(handleNextSlide());
   };
 
   const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
+    dispatch(handlePrevSlide());
   };
 
   const renderBarChart = () => (
@@ -152,7 +108,6 @@ export default function TrackingScreen() {
   );
 
   const renderPieChart = () => {
-    const totalTasks = taskCompletionData[0].count + taskCompletionData[1].count;
 
     return (
       <View style={styles.pieChartContainer}>
@@ -165,10 +120,10 @@ export default function TrackingScreen() {
           {/* Pie Chart using two semicircles */}
           <View style={styles.pieChartSemicircle}>
             {/* Top half - Completed (Green) */}
-            <View style={[styles.pieHalf, styles.pieTopHalf, { backgroundColor: taskCompletionData[0].color }]} />
+            <View style={[styles.pieHalf, styles.pieTopHalf, { backgroundColor: taskCompletionData[0]?.color || '#4CAF50' }]} />
             
             {/* Bottom half - Pending (Red/Orange) */}
-            <View style={[styles.pieHalf, styles.pieBottomHalf, { backgroundColor: taskCompletionData[1].color }]} />
+            <View style={[styles.pieHalf, styles.pieBottomHalf, { backgroundColor: taskCompletionData[1]?.color || '#FF5722' }]} />
           </View>
         </View>
         
@@ -185,8 +140,6 @@ export default function TrackingScreen() {
   };
 
   const renderLineChart = () => {
-    const maxPoints = Math.max(...dailyPointsData.map(d => d.points));
-    const totalPoints = dailyPointsData[dailyPointsData.length - 1].points;
 
     return (
       <View style={styles.lineChartContainer}>
@@ -206,8 +159,8 @@ export default function TrackingScreen() {
         <View style={styles.lineChart}>
           {dailyPointsData.map((point, index) => {
             const nextPoint = dailyPointsData[index + 1];
-            const height = (point.points / maxPoints) * 80;
-            const nextHeight = nextPoint ? (nextPoint.points / maxPoints) * 80 : height;
+            const height = maxPoints > 0 ? (point.points / maxPoints) * 80 : 0;
+            const nextHeight = nextPoint && maxPoints > 0 ? (nextPoint.points / maxPoints) * 80 : height;
             
             return (
               <View key={index} style={styles.lineChartPoint}>
@@ -245,34 +198,20 @@ export default function TrackingScreen() {
     );
   };
 
+  // Summary stats are now calculated in Redux selector
+
   return (
     <ScrollView style={styles.container}>
-      <ThemedView style={styles.header}>
-        <ThemedText type="title">Time Tracking</ThemedText>
-        <ThemedText style={styles.subtitle}>Track your daily activities</ThemedText>
-      </ThemedView>
-
-      <ThemedView style={styles.summaryCard}>
-        <ThemedText type="subtitle" style={styles.cardTitle}>Today's Summary</ThemedText>
-        <View style={styles.summaryStats}>
-          <View style={styles.summaryItem}>
-            <ThemedText type="defaultSemiBold" style={styles.summaryNumber}>15.0</ThemedText>
-            <ThemedText style={styles.summaryLabel}>Total Hours</ThemedText>
-          </View>
-          <View style={styles.summaryItem}>
-            <ThemedText type="defaultSemiBold" style={styles.summaryNumber}>4</ThemedText>
-            <ThemedText style={styles.summaryLabel}>Categories</ThemedText>
-          </View>
-          <View style={styles.summaryItem}>
-            <ThemedText type="defaultSemiBold" style={styles.summaryNumber}>85%</ThemedText>
-            <ThemedText style={styles.summaryLabel}>Productivity</ThemedText>
-          </View>
-        </View>
-      </ThemedView>
+      <TrackingHeader />
+      <SummaryCard 
+        totalHours={trackingStats.totalHours}
+        categories={trackingStats.categories}
+        productivity={trackingStats.productivity}
+      />
 
       <ThemedView style={styles.chartCard}>
         <View style={styles.chartHeader}>
-          <ThemedText type="subtitle" style={styles.cardTitle}>{slides[currentSlide].title}</ThemedText>
+          <ThemedText type="subtitle" style={styles.cardTitle}>{currentSlideData.title}</ThemedText>
           <View style={styles.slideControls}>
             <TouchableOpacity style={styles.slideButton} onPress={prevSlide}>
               <ThemedText style={styles.slideButtonText}>‹</ThemedText>
@@ -284,36 +223,16 @@ export default function TrackingScreen() {
           </View>
         </View>
 
-
-        {/* Time Period Selector */}
-        <View style={styles.timePeriodContainer}>
-          <View style={styles.timePeriodNavigation}>
-            <TouchableOpacity 
-              style={styles.timePeriodArrow}
-              onPress={() => navigateTimePeriod('prev')}
-            >
-              <ThemedText style={styles.arrowText}>‹</ThemedText>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.timePeriodDisplay}
-              onPress={handleCustomDateClick}
-            >
-              <ThemedText style={styles.timePeriodIcon}>{getTimePeriodIcon()}</ThemedText>
-              <ThemedText style={styles.timePeriodLabel}>{getTimePeriodLabel()}</ThemedText>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.timePeriodArrow}
-              onPress={() => navigateTimePeriod('next')}
-            >
-              <ThemedText style={styles.arrowText}>›</ThemedText>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <TimePeriodSelector
+          timePeriod={timePeriod}
+          onNavigate={navigateTimePeriod}
+          onCustomDateClick={handleCustomDateClick}
+          getTimePeriodLabel={() => timePeriodLabel}
+          getTimePeriodIcon={() => timePeriodIcon}
+        />
         
-        {slides[currentSlide].type === 'bar' ? renderBarChart() : 
-         slides[currentSlide].type === 'pie' ? renderPieChart() : renderLineChart()}
+        {currentSlideData.type === 'bar' ? renderBarChart() : 
+         currentSlideData.type === 'pie' ? renderPieChart() : renderLineChart()}
       </ThemedView>
 
       <ThemedView style={styles.categoriesCard}>
@@ -349,7 +268,7 @@ export default function TrackingScreen() {
         <View style={styles.fullPageOverlay}>
           <TouchableOpacity 
             style={styles.overlayBackground}
-            onPress={() => setShowCustomDatePicker(false)}
+            onPress={() => dispatch(handleCloseCustomDatePicker())}
             activeOpacity={1}
           >
             <View style={styles.customDatePicker}>
@@ -357,7 +276,7 @@ export default function TrackingScreen() {
                 <ThemedText style={styles.customDateTitle}>Custom Date Range</ThemedText>
                 <TouchableOpacity 
                   style={styles.closeButtonContainer}
-                  onPress={() => setShowCustomDatePicker(false)}
+                  onPress={() => dispatch(handleCloseCustomDatePicker())}
                 >
                   <ThemedText style={styles.closeButton}>✕</ThemedText>
                 </TouchableOpacity>
@@ -383,15 +302,14 @@ export default function TrackingScreen() {
                 <TouchableOpacity 
                   style={styles.applyButton}
                   onPress={() => {
-                    // Handle apply logic here
-                    setShowCustomDatePicker(false);
+                    dispatch(handleApplyCustomDateRange('2024-01-01', '2024-01-31'));
                   }}
                 >
                   <ThemedText style={styles.applyButtonText}>Apply</ThemedText>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={styles.cancelButton}
-                  onPress={() => setShowCustomDatePicker(false)}
+                  onPress={() => dispatch(handleCloseCustomDatePicker())}
                 >
                   <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
                 </TouchableOpacity>
@@ -408,46 +326,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    padding: 20,
-    paddingTop: 60,
-  },
-  subtitle: {
-    fontSize: 16,
-    opacity: 0.7,
-    marginTop: 4,
-  },
-  summaryCard: {
-    margin: 20,
-    padding: 20,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.02)',
-  },
-  cardTitle: {
-    marginBottom: 16,
-  },
-  summaryStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  summaryItem: {
-    alignItems: 'center',
-  },
-  summaryNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  summaryLabel: {
-    fontSize: 12,
-    opacity: 0.7,
-    marginTop: 4,
-  },
   chartCard: {
     margin: 20,
     marginTop: 0,
     padding: 20,
     borderRadius: 16,
     backgroundColor: 'rgba(0, 0, 0, 0.02)',
+  },
+  cardTitle: {
+    marginBottom: 16,
   },
   chartHeader: {
     flexDirection: 'row',
@@ -477,162 +364,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666666',
     marginHorizontal: 8,
-  },
-  // Time period selector styles
-  timePeriodContainer: {
-    marginBottom: 20,
-    position: 'relative',
-  },
-  timePeriodNavigation: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    borderRadius: 25,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    alignSelf: 'center',
-  },
-  timePeriodArrow: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 4,
-  },
-  arrowText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#666666',
-  },
-  timePeriodDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    minWidth: 120,
-  },
-  timePeriodIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  timePeriodLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333333',
-  },
-  // Full page overlay styles
-  fullPageOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1000,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  overlayBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // Custom date picker styles
-  customDatePicker: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 12,
-    width: '90%',
-    maxWidth: 320,
-  },
-  customDateHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  customDateTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333333',
-  },
-  closeButtonContainer: {
-    padding: 4,
-    borderRadius: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  closeButton: {
-    fontSize: 18,
-    color: '#666666',
-    fontWeight: 'bold',
-  },
-  dateInputs: {
-    marginBottom: 20,
-  },
-  dateInputGroup: {
-    marginBottom: 12,
-  },
-  dateLabel: {
-    fontSize: 12,
-    color: '#666666',
-    marginBottom: 6,
-  },
-  dateButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  dateButtonText: {
-    fontSize: 14,
-    color: '#333333',
-  },
-  customDateActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  applyButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    flex: 1,
-    marginRight: 8,
-  },
-  applyButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  cancelButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    flex: 1,
-    marginLeft: 8,
-  },
-  cancelButtonText: {
-    color: '#666666',
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
   },
   chartContainer: {
     flexDirection: 'row',
@@ -898,5 +629,115 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#4CAF50',
+  },
+  // Full page overlay styles
+  fullPageOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  overlayBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Custom date picker styles
+  customDatePicker: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 12,
+    width: '90%',
+    maxWidth: 320,
+  },
+  customDateHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  customDateTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333333',
+  },
+  closeButtonContainer: {
+    padding: 4,
+    borderRadius: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  closeButton: {
+    fontSize: 18,
+    color: '#666666',
+    fontWeight: 'bold',
+  },
+  dateInputs: {
+    marginBottom: 20,
+  },
+  dateInputGroup: {
+    marginBottom: 12,
+  },
+  dateLabel: {
+    fontSize: 12,
+    color: '#666666',
+    marginBottom: 6,
+  },
+  dateButton: {
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  dateButtonText: {
+    fontSize: 14,
+    color: '#333333',
+  },
+  customDateActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  applyButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    flex: 1,
+    marginRight: 8,
+  },
+  applyButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  cancelButton: {
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    flex: 1,
+    marginLeft: 8,
+  },
+  cancelButtonText: {
+    color: '#666666',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });

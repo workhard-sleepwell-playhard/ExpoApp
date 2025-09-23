@@ -1,48 +1,101 @@
 import React from 'react';
 import { StyleSheet, ScrollView, View, TouchableOpacity, Switch, Animated, Dimensions } from 'react-native';
+import { useSelector, useDispatch } from 'react-redux';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 
+// Import Redux selectors and actions
+import { 
+  selectUserData, 
+  selectUserStats, 
+  selectAchievements, 
+  selectNotificationsEnabled, 
+  selectShowSettings, 
+  selectShowEditProfile,
+  selectUserName,
+  selectUserEmail,
+  selectUserAvatar,
+  selectUserJoinDate,
+  selectTotalTasks,
+  selectCompletedTasks,
+  selectCurrentStreak,
+  selectTotalPoints,
+  selectProfileOptions,
+  selectProfileStats,
+  selectRecentAchievements
+} from '../../store/profile/profile.selector';
+import { 
+  loadUserProfile, 
+  handleOptionPress, 
+  saveProfileChanges, 
+  updateUserAvatar, 
+  updateUserName, 
+  updateUserEmail, 
+  handleCollectionPress, 
+  handleEditAvatar, 
+  openSettings,
+  closeSettings,
+  openEditProfile,
+  closeEditProfile,
+  toggleNotifications
+} from '../../store/profile/profile.action';
+
+// Import new components
+import { ProfileHeader } from '../../components/tabscomponents/profile/profileHeader.component';
+import { ProfileCard } from '../../components/tabscomponents/profile/profileCard.component';
+import { StatsCard } from '../../components/tabscomponents/profile/profileStatsCard.component';
+
 const { height: screenHeight } = Dimensions.get('window');
 
-// Dummy user data
-const userData = {
-  name: 'John Doe',
-  email: 'john.doe@example.com',
-  joinDate: 'January 2023',
-  avatar: '😊',
-  stats: {
-    totalTasks: 156,
-    completedTasks: 142,
-    currentStreak: 15,
-    totalPoints: 8750,
-  }
-};
-
-const profileOptions = [
-  { id: 1, title: 'Edit Profile', icon: 'person.circle.fill', action: 'navigate' },
-  { id: 2, title: 'Notifications', icon: 'bell.fill', action: 'toggle', enabled: true },
-  { id: 3, title: 'Privacy Settings', icon: 'lock.fill', action: 'navigate' },
-  { id: 4, title: 'Help & Support', icon: 'questionmark.circle.fill', action: 'navigate' },
-  { id: 5, title: 'About', icon: 'info.circle.fill', action: 'navigate' },
-  { id: 6, title: 'Logout', icon: 'power', action: 'logout', destructive: true },
-];
-
 export default function ProfileScreen() {
+  const dispatch = useDispatch();
   const colorScheme = useColorScheme();
-  const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
-  const [showSettings, setShowSettings] = React.useState(false);
-  const [showEditProfile, setShowEditProfile] = React.useState(false);
+  
+  // Redux state
+  const userData = useSelector(selectUserData);
+  const userStats = useSelector(selectUserStats);
+  const achievements = useSelector(selectAchievements);
+  const notificationsEnabled = useSelector(selectNotificationsEnabled);
+  const showSettings = useSelector(selectShowSettings);
+  const showEditProfile = useSelector(selectShowEditProfile);
+  const userName = useSelector(selectUserName);
+  const userEmail = useSelector(selectUserEmail);
+  const userAvatar = useSelector(selectUserAvatar);
+  const userJoinDate = useSelector(selectUserJoinDate);
+  const totalTasks = useSelector(selectTotalTasks);
+  const completedTasks = useSelector(selectCompletedTasks);
+  const currentStreak = useSelector(selectCurrentStreak);
+  const totalPoints = useSelector(selectTotalPoints);
+  const profileOptions = useSelector(selectProfileOptions);
+  const profileStats = useSelector(selectProfileStats);
+  const recentAchievements = useSelector(selectRecentAchievements);
+  
+  // Load initial data when component mounts
+  React.useEffect(() => {
+    // Load user profile data
+    dispatch(loadUserProfile({
+      name: 'John Doe',
+      email: 'john.doe@example.com',
+      joinDate: 'January 2024',
+      avatar: '👨‍💻',
+      stats: {
+        totalTasks: 127,
+        completedTasks: 89,
+        currentStreak: 12,
+        totalPoints: 2847,
+      }
+    }) as any);
+  }, [dispatch]);
   
   // Animation values
   const slideAnimation = React.useRef(new Animated.Value(screenHeight)).current;
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
 
-  const openSettings = () => {
-    setShowSettings(true);
+  const handleOpenSettings = () => {
+    dispatch(openSettings());
     Animated.parallel([
       Animated.timing(slideAnimation, {
         toValue: 0,
@@ -57,7 +110,7 @@ export default function ProfileScreen() {
     ]).start();
   };
 
-  const closeSettings = () => {
+  const handleCloseSettings = () => {
     Animated.parallel([
       Animated.timing(slideAnimation, {
         toValue: screenHeight,
@@ -70,122 +123,59 @@ export default function ProfileScreen() {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      setShowSettings(false);
+      dispatch(closeSettings() as any);
     });
   };
 
-  const handleOptionPress = (option: typeof profileOptions[0]) => {
-    if (option.action === 'toggle') {
-      setNotificationsEnabled(!notificationsEnabled);
-    } else if (option.title === 'Edit Profile') {
-      setShowEditProfile(true);
-    } else {
-      console.log(`${option.title} pressed`);
-    }
+  const onOptionPress = (option: typeof profileOptions[0]) => {
+    dispatch(handleOptionPress(option) as any);
   };
 
-  const closeEditProfile = () => {
-    setShowEditProfile(false);
+  const onCloseEditProfile = () => {
+    dispatch(closeEditProfile() as any);
+  };
+
+  const onCollectionPress = () => {
+    dispatch(handleCollectionPress() as any);
+  };
+
+  const onEditAvatar = () => {
+    dispatch(handleEditAvatar() as any);
   };
 
   return (
     <ScrollView style={styles.container}>
-          <ThemedView style={styles.header}>
-            <ThemedText type="title">Profile</ThemedText>
-            <TouchableOpacity style={styles.editProfileHeaderButton}>
-              <ThemedText style={styles.editProfileHeaderText}>Edit Profile</ThemedText>
-            </TouchableOpacity>
-          </ThemedView>
-
-      <ThemedView style={styles.profileCard}>
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <ThemedText style={styles.avatarText}>{userData.avatar}</ThemedText>
-          </View>
-          <TouchableOpacity style={styles.editAvatarButton}>
-            <IconSymbol name="camera.fill" size={16} color="white" />
-          </TouchableOpacity>
-        </View>
-        
-        <ThemedText type="subtitle" style={styles.userName}>{userData.name}</ThemedText>
-        
-        <TouchableOpacity style={styles.collectionButton}>
-          <IconSymbol name="folder.fill" size={16} color="white" />
-          <ThemedText style={styles.collectionButtonText}>Collection</ThemedText>
-        </TouchableOpacity>
-      </ThemedView>
-
-      <ThemedView style={styles.statsCard}>
-        <ThemedText type="subtitle" style={styles.cardTitle}>Your Stats</ThemedText>
-        <View style={styles.statsGrid}>
-          <View style={styles.statItem}>
-            <ThemedText type="defaultSemiBold" style={styles.statNumber}>
-              {userData.stats.totalTasks}
-            </ThemedText>
-            <ThemedText style={styles.statLabel}>Total Tasks</ThemedText>
-          </View>
-          <View style={styles.statItem}>
-            <ThemedText type="defaultSemiBold" style={styles.statNumber}>
-              {userData.stats.completedTasks}
-            </ThemedText>
-            <ThemedText style={styles.statLabel}>Completed</ThemedText>
-          </View>
-          <View style={styles.statItem}>
-            <ThemedText type="defaultSemiBold" style={styles.statNumber}>
-              {userData.stats.currentStreak}
-            </ThemedText>
-            <ThemedText style={styles.statLabel}>Day Streak</ThemedText>
-          </View>
-          <View style={styles.statItem}>
-            <ThemedText type="defaultSemiBold" style={styles.statNumber}>
-              {userData.stats.totalPoints.toLocaleString()}
-            </ThemedText>
-            <ThemedText style={styles.statLabel}>Total Points</ThemedText>
-          </View>
-        </View>
-      </ThemedView>
+      <ProfileHeader onEditProfile={() => dispatch(openEditProfile() as any)} />
+      <ProfileCard 
+        name={userName}
+        avatar={userAvatar}
+        onCollectionPress={onCollectionPress}
+        onEditAvatar={onEditAvatar}
+      />
+      <StatsCard 
+        totalTasks={totalTasks}
+        completedTasks={completedTasks}
+        currentStreak={currentStreak}
+        totalPoints={totalPoints}
+      />
 
       <ThemedView style={styles.achievementsCard}>
         <ThemedText type="subtitle" style={styles.cardTitle}>Recent Achievements</ThemedText>
         <View style={styles.achievementsList}>
-          <View style={styles.achievementItem}>
-            <View style={[styles.achievementIcon, { backgroundColor: '#FFD700' }]}>
-              <IconSymbol name="trophy.fill" size={20} color="white" />
+          {recentAchievements.map((achievement: any) => (
+            <View key={achievement.id} style={styles.achievementItem}>
+              <View style={[styles.achievementIcon, { backgroundColor: achievement.color }]}>
+                <IconSymbol name={achievement.icon as any} size={20} color="white" />
+              </View>
+              <View style={styles.achievementInfo}>
+                <ThemedText style={styles.achievementTitle}>{achievement.title}</ThemedText>
+                <ThemedText style={styles.achievementDescription}>
+                  {achievement.description}
+                </ThemedText>
+              </View>
+              <ThemedText style={styles.achievementDate}>{achievement.date}</ThemedText>
             </View>
-            <View style={styles.achievementInfo}>
-              <ThemedText style={styles.achievementTitle}>Streak Master</ThemedText>
-              <ThemedText style={styles.achievementDescription}>
-                15-day streak achieved!
-              </ThemedText>
-            </View>
-            <ThemedText style={styles.achievementDate}>2 days ago</ThemedText>
-          </View>
-          
-          <View style={styles.achievementItem}>
-            <View style={[styles.achievementIcon, { backgroundColor: '#34C759' }]}>
-              <IconSymbol name="checkmark.seal.fill" size={20} color="white" />
-            </View>
-            <View style={styles.achievementInfo}>
-              <ThemedText style={styles.achievementTitle}>Task Master</ThemedText>
-              <ThemedText style={styles.achievementDescription}>
-                100 tasks completed!
-              </ThemedText>
-            </View>
-            <ThemedText style={styles.achievementDate}>1 week ago</ThemedText>
-          </View>
-          
-          <View style={styles.achievementItem}>
-            <View style={[styles.achievementIcon, { backgroundColor: '#007AFF' }]}>
-              <IconSymbol name="sunrise.fill" size={20} color="white" />
-            </View>
-            <View style={styles.achievementInfo}>
-              <ThemedText style={styles.achievementTitle}>Early Bird</ThemedText>
-              <ThemedText style={styles.achievementDescription}>
-                5 tasks before 9 AM
-              </ThemedText>
-            </View>
-            <ThemedText style={styles.achievementDate}>2 weeks ago</ThemedText>
-          </View>
+          ))}
         </View>
       </ThemedView>
 
@@ -193,7 +183,7 @@ export default function ProfileScreen() {
       <View style={styles.settingsContainer}>
         <TouchableOpacity 
           style={styles.settingsButton}
-          onPress={openSettings}
+          onPress={handleOpenSettings}
         >
           <ThemedText style={styles.settingsGear}>⚙️</ThemedText>
         </TouchableOpacity>
@@ -204,7 +194,7 @@ export default function ProfileScreen() {
         <Animated.View style={[styles.settingsOverlay, { opacity: overlayOpacity }]}>
           <TouchableOpacity 
             style={styles.overlayBackground}
-            onPress={closeSettings}
+            onPress={handleCloseSettings}
             activeOpacity={1}
           >
             <Animated.View 
@@ -215,18 +205,17 @@ export default function ProfileScreen() {
             >
               <View style={styles.modalHeader}>
                 <ThemedText type="subtitle" style={styles.modalTitle}>Settings</ThemedText>
-                <TouchableOpacity onPress={closeSettings} style={styles.closeButton}>
+                <TouchableOpacity onPress={handleCloseSettings} style={styles.closeButton}>
                   <ThemedText style={styles.closeButtonText}>✕</ThemedText>
                 </TouchableOpacity>
               </View>
-
 
               <ScrollView style={styles.settingsContent}>
                 {profileOptions.map((option) => (
                   <TouchableOpacity 
                     key={option.id} 
                     style={styles.optionItem}
-                    onPress={() => handleOptionPress(option)}
+                    onPress={() => onOptionPress(option)}
                   >
                     <View style={styles.optionLeft}>
                       <IconSymbol 
@@ -245,7 +234,7 @@ export default function ProfileScreen() {
                     {option.action === 'toggle' ? (
                       <Switch
                         value={option.id === 2 ? notificationsEnabled : false}
-                        onValueChange={() => handleOptionPress(option)}
+                        onValueChange={() => dispatch(toggleNotifications() as any)}
                         trackColor={{ false: '#767577', true: Colors[colorScheme ?? 'light'].tint }}
                         thumbColor={notificationsEnabled ? '#f4f3f4' : '#f4f3f4'}
                       />
@@ -265,7 +254,7 @@ export default function ProfileScreen() {
         <Animated.View style={[styles.settingsOverlay, { opacity: overlayOpacity }]}>
           <TouchableOpacity 
             style={styles.overlayBackground}
-            onPress={closeEditProfile}
+            onPress={onCloseEditProfile}
             activeOpacity={1}
           >
             <Animated.View 
@@ -276,7 +265,7 @@ export default function ProfileScreen() {
             >
               <View style={styles.modalHeader}>
                 <ThemedText type="subtitle" style={styles.modalTitle}>Edit Profile</ThemedText>
-                <TouchableOpacity onPress={closeEditProfile} style={styles.closeButton}>
+                <TouchableOpacity onPress={onCloseEditProfile} style={styles.closeButton}>
                   <ThemedText style={styles.closeButtonText}>✕</ThemedText>
                 </TouchableOpacity>
               </View>
@@ -287,7 +276,7 @@ export default function ProfileScreen() {
                   <IconSymbol name="envelope.fill" size={20} color="#007AFF" />
                   <View style={styles.userInfoText}>
                     <ThemedText style={styles.userInfoLabel}>Email</ThemedText>
-                    <ThemedText style={styles.userInfoValue}>{userData.email}</ThemedText>
+                    <ThemedText style={styles.userInfoValue}>{userEmail}</ThemedText>
                   </View>
                 </View>
                 
@@ -295,7 +284,7 @@ export default function ProfileScreen() {
                   <IconSymbol name="clock.fill" size={20} color="#007AFF" />
                   <View style={styles.userInfoText}>
                     <ThemedText style={styles.userInfoLabel}>Member Since</ThemedText>
-                    <ThemedText style={styles.userInfoValue}>{userData.joinDate}</ThemedText>
+                    <ThemedText style={styles.userInfoValue}>{userJoinDate}</ThemedText>
                   </View>
                 </View>
               </View>
@@ -307,7 +296,7 @@ export default function ProfileScreen() {
                   <View style={styles.inputGroup}>
                     <ThemedText style={styles.inputLabel}>Display Name</ThemedText>
                     <View style={styles.inputField}>
-                      <ThemedText style={styles.inputText}>{userData.name}</ThemedText>
+                      <ThemedText style={styles.inputText}>{userName}</ThemedText>
                     </View>
                   </View>
 
@@ -315,7 +304,7 @@ export default function ProfileScreen() {
                     <ThemedText style={styles.inputLabel}>Avatar</ThemedText>
                     <View style={styles.avatarEditContainer}>
                       <View style={styles.avatarEdit}>
-                        <ThemedText style={styles.avatarEditText}>{userData.avatar}</ThemedText>
+                        <ThemedText style={styles.avatarEditText}>{userAvatar}</ThemedText>
                       </View>
                       <TouchableOpacity style={styles.changeAvatarButton}>
                         <ThemedText style={styles.changeAvatarText}>Change Avatar</ThemedText>
@@ -340,78 +329,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-      header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 20,
-        paddingTop: 60,
-      },
-  profileCard: {
-    margin: 20,
-    padding: 24,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.02)',
-    alignItems: 'center',
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    fontSize: 32,
-  },
-  editAvatarButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: Colors.light.tint,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-      userName: {
-        marginBottom: 16,
-      },
-      collectionButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#007AFF',
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderRadius: 20,
-        marginTop: 8,
-      },
-      collectionButtonText: {
-        color: 'white',
-        fontSize: 14,
-        fontWeight: '600',
-        marginLeft: 6,
-      },
-      // Header edit profile button styles
-      editProfileHeaderButton: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 16,
-        backgroundColor: 'rgba(0, 0, 0, 0.05)',
-      },
-      editProfileHeaderText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#007AFF',
-      },
-  statsCard: {
+  achievementsCard: {
     margin: 20,
     marginTop: 0,
     padding: 20,
@@ -421,51 +339,22 @@ const styles = StyleSheet.create({
   cardTitle: {
     marginBottom: 20,
   },
-  statsGrid: {
+  achievementsList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 12,
   },
-  statItem: {
-    width: '48%',
+  achievementItem: {
+    flexDirection: 'column',
     alignItems: 'center',
-    paddingVertical: 16,
-    marginBottom: 16,
+    padding: 12,
     backgroundColor: 'rgba(0, 0, 0, 0.02)',
     borderRadius: 12,
+    width: '30%',
+    minHeight: 100,
+    justifyContent: 'center',
   },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  statLabel: {
-    fontSize: 12,
-    opacity: 0.7,
-    marginTop: 4,
-  },
-  achievementsCard: {
-    margin: 20,
-    marginTop: 0,
-    padding: 20,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.02)',
-  },
-      achievementsList: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        gap: 12,
-      },
-      achievementItem: {
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: 12,
-        backgroundColor: 'rgba(0, 0, 0, 0.02)',
-        borderRadius: 12,
-        width: '30%',
-        minHeight: 100,
-        justifyContent: 'center',
-      },
   achievementIcon: {
     width: 32,
     height: 32,

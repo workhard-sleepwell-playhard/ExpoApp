@@ -253,6 +253,48 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "achievementBadges",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "category",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "points",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "achievementBadges",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "rarity",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "points",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "achievementBadges",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "badgeType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "points",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

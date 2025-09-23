@@ -65,7 +65,7 @@ If you're using Expo, you can also use the Web app configuration:
 ## Step 4: Update Configuration Files
 
 ### Option A: Using Web Config (Recommended for Expo)
-Replace the configuration in `src/config/firebase.ts`:
+Replace the configuration in `src/utils/firebase/config.ts`:
 
 ```typescript
 const firebaseConfig = {

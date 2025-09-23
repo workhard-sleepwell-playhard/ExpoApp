@@ -104,15 +104,22 @@ async function initializeTags() {
       createdAt: new Date()
     },
     {
-      name: 'review',
-      color: '#007AFF',
+      name: 'not important',
+      color: '#FF9500',
       userId: null,
       usageCount: 0,
       createdAt: new Date()
     },
     {
-      name: 'documentation',
-      color: '#34C759',
+      name: 'break',
+      color: '#FF9500',
+      userId: null,
+      usageCount: 0,
+      createdAt: new Date()
+    },
+    {
+      name: 'review',
+      color: '#007AFF',
       userId: null,
       usageCount: 0,
       createdAt: new Date()
@@ -145,9 +152,9 @@ async function initializeTags() {
   }
 }
 
-// Initialize default achievements
-async function initializeAchievements() {
-  const achievements = [
+// Initialize default achievement badges
+async function initializeAchievementBadges() {
+  const achievementBadges = [
     {
       title: 'First Task',
       description: 'Complete your first task',
@@ -155,7 +162,8 @@ async function initializeAchievements() {
       category: 'task',
       rarity: 'common',
       points: 10,
-      progressTarget: 1
+      badgeType: 'completion',
+      badgeProgressTarget: 1
     },
     {
       title: 'Task Master',
@@ -164,7 +172,8 @@ async function initializeAchievements() {
       category: 'task',
       rarity: 'rare',
       points: 100,
-      progressTarget: 100
+      badgeType: 'milestone',
+      badgeProgressTarget: 100
     },
     {
       title: 'Streak Master',
@@ -173,7 +182,8 @@ async function initializeAchievements() {
       category: 'streak',
       rarity: 'epic',
       points: 50,
-      progressTarget: 7
+      badgeType: 'streak',
+      badgeProgressTarget: 7
     },
     {
       title: 'Early Bird',
@@ -182,7 +192,8 @@ async function initializeAchievements() {
       category: 'productivity',
       rarity: 'rare',
       points: 30,
-      progressTarget: 5
+      badgeType: 'time-based',
+      badgeProgressTarget: 5
     },
     {
       title: 'Social Butterfly',
@@ -191,22 +202,22 @@ async function initializeAchievements() {
       category: 'social',
       rarity: 'common',
       points: 25,
-      progressTarget: 10
+      badgeType: 'social',
+      badgeProgressTarget: 10
     }
   ];
 
-  console.log('Initializing achievements...');
-  for (const achievement of achievements) {
+  console.log('Initializing achievement badges...');
+  for (const badge of achievementBadges) {
     try {
-      const achievementRef = doc(collection(db, 'achievementTemplates'));
-      await setDoc(achievementRef, {
-        ...achievement,
-        isTemplate: true,
+      const badgeRef = doc(collection(db, 'achievementBadges'));
+      await setDoc(badgeRef, {
+        ...badge,
         createdAt: new Date()
       });
-      console.log(`✓ Achievement template "${achievement.title}" created with ID: ${achievementRef.id}`);
+      console.log(`✓ Achievement badge "${badge.title}" created with ID: ${badgeRef.id}`);
     } catch (error) {
-      console.error(`✗ Error creating achievement "${achievement.title}":`, error);
+      console.error(`✗ Error creating achievement badge "${badge.title}":`, error);
     }
   }
 }
@@ -222,7 +233,7 @@ async function initializeFirebaseData() {
     await initializeTags();
     console.log('');
     
-    await initializeAchievements();
+    await initializeAchievementBadges();
     console.log('');
     
     console.log('✅ Firebase data initialization completed successfully!');
