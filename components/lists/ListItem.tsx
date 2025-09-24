@@ -306,3 +306,4 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 122, 255, 0.1)',
   },
 });
+

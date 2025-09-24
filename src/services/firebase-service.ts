@@ -15,6 +15,7 @@ import {
   onSnapshot,
   serverTimestamp,
   Timestamp,
+  FieldValue,
   QuerySnapshot,
   DocumentSnapshot
 } from 'firebase/firestore';
@@ -28,9 +29,9 @@ export interface User {
   avatar?: string;
   username?: string;
   bio?: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-  lastActiveAt: Timestamp;
+  createdAt: Timestamp | FieldValue;
+  updatedAt: Timestamp | FieldValue;
+  lastActiveAt: Timestamp | FieldValue;
   isActive: boolean;
   
   // Profile & Preferences
@@ -192,7 +193,7 @@ export interface User {
     currentTaskId?: string;
     sessionStartTime?: Timestamp;
     breakStartTime?: Timestamp;
-    lastLoginAt: Timestamp;
+    lastLoginAt: Timestamp | FieldValue;
     loginStreak: number;
     totalLoginDays: number;
   };
@@ -202,14 +203,14 @@ export interface User {
     emailVerified: boolean;
     phoneVerified: boolean;
     twoFactorEnabled: boolean;
-    lastPasswordChange: Timestamp;
+    lastPasswordChange: Timestamp | FieldValue;
     securityScore: number; // 0-100
   };
   
   // Subscription & Premium Features
   subscription: {
     plan: 'free' | 'premium' | 'pro';
-    startDate: Timestamp;
+    startDate: Timestamp | FieldValue;
     endDate?: Timestamp;
     features: string[];
     usageLimits: {
@@ -1224,6 +1225,12 @@ export class PostService {
     );
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ postId: doc.id, ...doc.data() } as Post));
+  }
+
+  // Delete a post
+  static async deletePost(postId: string): Promise<void> {
+    const postRef = doc(db, 'posts', postId);
+    await deleteDoc(postRef);
   }
 }
 

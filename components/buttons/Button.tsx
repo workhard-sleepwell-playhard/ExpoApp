@@ -6,7 +6,7 @@ import { Colors } from '@/constants/theme';
 export interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'delete';
   size?: 'small' | 'medium' | 'large';
   disabled?: boolean;
   loading?: boolean;
@@ -71,6 +71,12 @@ export const Button: React.FC<ButtonProps> = ({
           { backgroundColor: '#FF3B30' }
         ]);
         break;
+      case 'delete':
+        baseStyles.push([
+          styles.delete,
+          { backgroundColor: '#FF453A' }
+        ]);
+        break;
     }
     
     return baseStyles;
@@ -96,6 +102,9 @@ export const Button: React.FC<ButtonProps> = ({
         break;
       case 'destructive':
         baseStyles.push(styles.destructiveText);
+        break;
+      case 'delete':
+        baseStyles.push(styles.deleteText);
         break;
     }
     
@@ -175,6 +184,13 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  delete: {
+    shadowColor: '#FF453A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   // Text styles
   text: {
     fontWeight: '600',
@@ -193,6 +209,9 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   destructiveText: {
+    color: 'white',
+  },
+  deleteText: {
     color: 'white',
   },
   // States

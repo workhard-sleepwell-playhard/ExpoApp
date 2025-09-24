@@ -1,6 +1,7 @@
 // only an example layout for you to memorize and replicate // 
 
 import { combineReducers } from 'redux'
+import { authReducer } from './auth/auth.reducer.js'
 import { homeReducer } from './home/home.reducer.js'
 import { taskReducer } from './task/task.reducer.js'
 import { trackingReducer } from './tracking/tracking.reducer.js'
@@ -9,6 +10,7 @@ import { profileReducer } from './profile/profile.reducer.js'
 import { moreReducer } from './more/more.reducer.js'
 
 export const rootReducer = combineReducers({
+    auth: authReducer,
     home: homeReducer,
     task: taskReducer,
     tracking: trackingReducer,

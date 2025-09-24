@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, ScrollView, View, TouchableOpacity, Switch, Animated, Dimensions } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { ThemedText } from '@/components/themed-text';
@@ -6,6 +6,7 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 // Import Redux selectors and actions
 import { 
@@ -42,17 +43,26 @@ import {
   closeEditProfile,
   toggleNotifications
 } from '../../store/profile/profile.action';
+import { fetchPosts } from '../../store/home/home.action';
+import { signOutStart } from '../../store/auth/auth.action';
 
 // Import new components
 import { ProfileHeader } from '../../components/tabscomponents/profile/profileHeader.component';
 import { ProfileCard } from '../../components/tabscomponents/profile/profileCard.component';
 import { StatsCard } from '../../components/tabscomponents/profile/profileStatsCard.component';
+import { ConfirmationModal } from '../../components/modals/ConfirmationModal';
 
 const { height: screenHeight } = Dimensions.get('window');
 
 export default function ProfileScreen() {
   const dispatch = useDispatch();
   const colorScheme = useColorScheme();
+  
+  // Auth context - now available in any tab!
+  const { isAuthenticated, isLoading, currentUser } = useAuth();
+  
+  // Confirmation modal state
+  const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
   
   // Redux state
   const userData = useSelector(selectUserData);
@@ -128,7 +138,26 @@ export default function ProfileScreen() {
   };
 
   const onOptionPress = (option: typeof profileOptions[0]) => {
-    dispatch(handleOptionPress(option) as any);
+    if (option.title === 'Logout') {
+      setShowLogoutConfirmation(true);
+    } else {
+      dispatch(handleOptionPress(option) as any);
+    }
+  };
+
+  const handleLogoutConfirm = async () => {
+    try {
+      setShowLogoutConfirmation(false);
+      await dispatch(signOutStart() as any);
+      // The auth state listener will handle navigation
+    } catch (error) {
+      console.error('Logout error:', error);
+      // You could show another custom modal for error if needed
+    }
+  };
+
+  const handleLogoutCancel = () => {
+    setShowLogoutConfirmation(false);
   };
 
   const onCloseEditProfile = () => {
@@ -143,9 +172,51 @@ export default function ProfileScreen() {
     dispatch(handleEditAvatar() as any);
   };
 
+  const onMyPosts = async () => {
+    try {
+      // For now, we'll fetch posts for the current user
+      // TODO: Get actual current user ID from auth context
+      const currentUserId = 'current-user-id'; // This should come from auth context
+      
+      console.log('Fetching user posts for:', currentUserId);
+      
+      // Fetch user's posts using the thunk function
+      const userPosts = await dispatch(fetchPosts(currentUserId) as any);
+      
+      console.log('User posts fetched:', userPosts.length, 'posts');
+      
+      // TODO: Navigate to My Posts screen or show posts in a modal
+      // For now, we'll just log the results
+      console.log('My Posts', `Found ${userPosts.length} posts. Navigation to My Posts screen will be implemented next.`);
+      
+    } catch (error) {
+      console.error('Error fetching user posts:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Failed to fetch posts:', errorMessage);
+    }
+  };
+
   return (
     <ScrollView style={styles.container}>
-      <ProfileHeader onEditProfile={() => dispatch(openEditProfile() as any)} />
+      <ProfileHeader 
+        onEditProfile={() => dispatch(openEditProfile() as any)} 
+        onMyPosts={onMyPosts}
+      />
+      
+      {/* Auth State Display - Demo of auth context access */}
+      <ThemedView style={styles.authStateCard}>
+        <ThemedText type="subtitle" style={styles.cardTitle}>Auth State (Demo)</ThemedText>
+        <ThemedText style={styles.authStateText}>
+          Authenticated: {isAuthenticated ? '✅ Yes' : '❌ No'}
+        </ThemedText>
+        <ThemedText style={styles.authStateText}>
+          Loading: {isLoading ? '⏳ Yes' : '✅ No'}
+        </ThemedText>
+        <ThemedText style={styles.authStateText}>
+          User: {currentUser ? currentUser.email || 'Logged in' : 'Not logged in'}
+        </ThemedText>
+      </ThemedView>
+      
       <ProfileCard 
         name={userName}
         avatar={userAvatar}
@@ -321,6 +392,18 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </Animated.View>
       )}
+
+      {/* Logout Confirmation Modal */}
+      <ConfirmationModal
+        visible={showLogoutConfirmation}
+        title="Logout"
+        message="Are you sure you want to logout?"
+        confirmText="Logout"
+        cancelText="Cancel"
+        confirmStyle="destructive"
+        onConfirm={handleLogoutConfirm}
+        onCancel={handleLogoutCancel}
+      />
     </ScrollView>
   );
 }
@@ -573,5 +656,19 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Auth State Demo Styles
+  authStateCard: {
+    margin: 16,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  authStateText: {
+    fontSize: 14,
+    marginVertical: 2,
+    color: '#495057',
   },
 });

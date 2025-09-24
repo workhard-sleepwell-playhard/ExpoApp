@@ -89,7 +89,7 @@ export default function TrackingScreen() {
 
   const renderBarChart = () => (
     <View style={styles.chartContainer}>
-      {weeklyProgress.map((day, index) => (
+      {weeklyProgress.map((day: any, index: number) => (
         <View key={index} style={styles.chartBar}>
           <View 
             style={[
@@ -128,7 +128,7 @@ export default function TrackingScreen() {
         </View>
         
         <View style={styles.pieLegend}>
-          {taskCompletionData.map((item) => (
+          {taskCompletionData.map((item: any) => (
             <View key={item.id} style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: item.color }]} />
               <ThemedText style={styles.legendText}>{item.category}: {item.count} ({item.percentage}%)</ThemedText>
@@ -157,7 +157,7 @@ export default function TrackingScreen() {
         </View>
 
         <View style={styles.lineChart}>
-          {dailyPointsData.map((point, index) => {
+          {dailyPointsData.map((point: any, index: number) => {
             const nextPoint = dailyPointsData[index + 1];
             const height = maxPoints > 0 ? (point.points / maxPoints) * 80 : 0;
             const nextHeight = nextPoint && maxPoints > 0 ? (nextPoint.points / maxPoints) * 80 : height;
@@ -186,7 +186,7 @@ export default function TrackingScreen() {
 
         <View style={styles.recentActivity}>
           <ThemedText style={styles.activityTitle}>Recent Activity</ThemedText>
-          {dailyPointsData.slice(-3).map((point, index) => (
+          {dailyPointsData.slice(-3).map((point: any, index: number) => (
             <View key={index} style={styles.activityItem}>
               <View style={styles.activityDot} />
               <ThemedText style={styles.activityText}>{point.activity}</ThemedText>
@@ -237,7 +237,7 @@ export default function TrackingScreen() {
 
       <ThemedView style={styles.categoriesCard}>
         <ThemedText type="subtitle" style={styles.cardTitle}>Categories</ThemedText>
-        {trackingData.map((item) => (
+        {trackingData.map((item: any) => (
           <View key={item.id} style={styles.categoryItem}>
             <View style={styles.categoryLeft}>
               <View style={[styles.categoryIcon, { backgroundColor: item.color }]}>

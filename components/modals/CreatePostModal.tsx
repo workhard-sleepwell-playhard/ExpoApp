@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, ScrollView, View, TouchableOpacity, TextInput, Animated, Dimensions } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 
-const { height: screenHeight } = Dimensions.get('window');
+const { height: screenHeight } = Dimensions.get('screen');
 
 interface CreatePostModalProps {
   visible: boolean;
@@ -20,6 +20,7 @@ interface CreatePostModalProps {
   onPost: () => void;
   slideAnimation: Animated.Value;
   overlayOpacity: Animated.Value;
+  isLoading?: boolean;
 }
 
 export const CreatePostModal: React.FC<CreatePostModalProps> = ({
@@ -38,6 +39,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   onPost,
   slideAnimation,
   overlayOpacity,
+  isLoading = false,
 }) => {
   const addImage = () => {
     const dummyImages = ['📸', '🖼️', '📷', '🎨'];
@@ -63,10 +65,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
 
   return (
     <Animated.View style={[styles.postModalOverlay, { opacity: overlayOpacity }]}>
-      <TouchableOpacity 
+      <View 
         style={styles.modalBackground}
-        onPress={onClose}
-        activeOpacity={1}
       >
         <Animated.View 
           style={[
@@ -74,7 +74,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             { transform: [{ translateY: slideAnimation }] }
           ]}
         >
-          {/* Modal Header */}
+          {/* Modal Header - Fixed */}
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={onClose}>
               <ThemedText style={styles.cancelButton}>Cancel</ThemedText>
@@ -82,166 +82,176 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             <ThemedText style={styles.modalTitle}>Create Post</ThemedText>
             <TouchableOpacity 
               onPress={onPost}
-              style={[styles.postButton, { opacity: postContent.trim() ? 1 : 0.5 }]}
-              disabled={!postContent.trim()}
+              style={[styles.postButton, { opacity: postContent.trim() && !isLoading ? 1 : 0.5 }]}
+              disabled={!postContent.trim() || isLoading}
             >
-              <ThemedText style={styles.postButtonText}>Post</ThemedText>
+              <ThemedText style={styles.postButtonText}>
+                {isLoading ? 'Posting...' : 'Post'}
+              </ThemedText>
             </TouchableOpacity>
           </View>
 
-          {/* Post Type Selection */}
-          <View style={styles.postTypeContainer}>
-            <ThemedText style={styles.postTypeLabel}>Post Type:</ThemedText>
-            <View style={styles.postTypeButtons}>
-              {[
-                { key: 'general', label: 'General', icon: '💭' },
-                { key: 'achievement', label: 'Achievement', icon: '🏆' },
-                { key: 'task', label: 'Task Update', icon: '✅' },
-                { key: 'question', label: 'Question', icon: '❓' },
-              ].map((type) => (
-                <TouchableOpacity
-                  key={type.key}
-                  style={[
-                    styles.postTypeButton,
-                    postType === type.key && styles.selectedPostType
-                  ]}
-                  onPress={() => setPostType(type.key as any)}
-                >
-                  <ThemedText style={styles.postTypeIcon}>{type.icon}</ThemedText>
-                  <ThemedText style={[
-                    styles.postTypeText,
-                    postType === type.key && styles.selectedPostTypeText
-                  ]}>
-                    {type.label}
-                  </ThemedText>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Content Input */}
-          <View style={styles.contentContainer}>
-            <TextInput
-              style={styles.contentInput}
-              placeholder="Share your thoughts, achievements, or ask a question..."
-              placeholderTextColor="#999"
-              value={postContent}
-              onChangeText={setPostContent}
-              multiline
-              textAlignVertical="top"
-              maxLength={500}
-            />
-            <ThemedText style={styles.characterCount}>
-              {postContent.length}/500
-            </ThemedText>
-          </View>
-
-          {/* Media Selection */}
-          <View style={styles.mediaSection}>
-            <View style={styles.mediaSectionHeader}>
-              <ThemedText style={styles.mediaSectionTitle}>Media</ThemedText>
-              <View style={styles.mediaButtons}>
-                <TouchableOpacity style={styles.addMediaButton} onPress={addImage}>
-                  <ThemedText style={styles.addMediaIcon}>📷</ThemedText>
-                  <ThemedText style={styles.addMediaText}>Photo</ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.addMediaButton} onPress={addVideo}>
-                  <ThemedText style={styles.addMediaIcon}>🎬</ThemedText>
-                  <ThemedText style={styles.addMediaText}>Video</ThemedText>
-                </TouchableOpacity>
+          {/* Scrollable Content */}
+          <ScrollView 
+            style={styles.scrollableContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Post Type Selection */}
+            <View style={styles.postTypeContainer}>
+              <ThemedText style={styles.postTypeLabel}>Post Type:</ThemedText>
+              <View style={styles.postTypeButtons}>
+                {[
+                  { key: 'general', label: 'General', icon: '💭' },
+                  { key: 'achievement', label: 'Achievement', icon: '🏆' },
+                  { key: 'task', label: 'Task Update', icon: '✅' },
+                  { key: 'question', label: 'Question', icon: '❓' },
+                ].map((type) => (
+                  <TouchableOpacity
+                    key={type.key}
+                    style={[
+                      styles.postTypeButton,
+                      postType === type.key && styles.selectedPostType
+                    ]}
+                    onPress={() => setPostType(type.key as any)}
+                  >
+                    <ThemedText style={styles.postTypeIcon}>{type.icon}</ThemedText>
+                    <ThemedText style={[
+                      styles.postTypeText,
+                      postType === type.key && styles.selectedPostTypeText
+                    ]}>
+                      {type.label}
+                    </ThemedText>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
-            
-            {/* Images Preview */}
-            {selectedImages.length > 0 && (
-              <View style={styles.mediaPreviewSection}>
-                <ThemedText style={styles.mediaPreviewTitle}>Photos ({selectedImages.length})</ThemedText>
-                <ScrollView horizontal style={styles.mediaPreviewContainer}>
-                  {selectedImages.map((image, index) => (
-                    <View key={`img-${index}`} style={styles.mediaPreview}>
-                      <ThemedText style={styles.mediaPreviewText}>{image}</ThemedText>
-                      <TouchableOpacity 
-                        style={styles.removeMediaButton}
-                        onPress={() => removeImage(index)}
-                      >
-                        <ThemedText style={styles.removeMediaIcon}>✕</ThemedText>
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
 
-            {/* Videos Preview */}
-            {selectedVideos.length > 0 && (
-              <View style={styles.mediaPreviewSection}>
-                <ThemedText style={styles.mediaPreviewTitle}>Videos ({selectedVideos.length})</ThemedText>
-                <ScrollView horizontal style={styles.mediaPreviewContainer}>
-                  {selectedVideos.map((video, index) => (
-                    <View key={`vid-${index}`} style={[styles.mediaPreview, styles.videoPreview]}>
-                      <ThemedText style={styles.mediaPreviewText}>{video}</ThemedText>
-                      <View style={styles.videoPlayButton}>
-                        <ThemedText style={styles.playIcon}>▶️</ThemedText>
-                      </View>
-                      <TouchableOpacity 
-                        style={styles.removeMediaButton}
-                        onPress={() => removeVideo(index)}
-                      >
-                        <ThemedText style={styles.removeMediaIcon}>✕</ThemedText>
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-          </View>
+            {/* Content Input */}
+            <View style={styles.contentContainer}>
+              <TextInput
+                style={styles.contentInput}
+                placeholder="Share your thoughts, achievements, or ask a question..."
+                placeholderTextColor="#999"
+                value={postContent}
+                onChangeText={setPostContent}
+                multiline
+                textAlignVertical="top"
+                maxLength={500}
+              />
+              <ThemedText style={styles.characterCount}>
+                {postContent.length}/500
+              </ThemedText>
+            </View>
 
-          {/* Post Options */}
-          <View style={styles.postOptions}>
-            <View style={styles.optionRow}>
-              <View style={styles.optionLeft}>
-                <ThemedText style={styles.optionIcon}>🌍</ThemedText>
-                <View>
-                  <ThemedText style={styles.optionTitle}>Public Post</ThemedText>
-                  <ThemedText style={styles.optionDescription}>
-                    Anyone can see this post
-                  </ThemedText>
+            {/* Media Selection */}
+            <View style={styles.mediaSection}>
+              <View style={styles.mediaSectionHeader}>
+                <ThemedText style={styles.mediaSectionTitle}>Media</ThemedText>
+                <View style={styles.mediaButtons}>
+                  <TouchableOpacity style={styles.addMediaButton} onPress={addImage}>
+                    <ThemedText style={styles.addMediaIcon}>📷</ThemedText>
+                    <ThemedText style={styles.addMediaText}>Photo</ThemedText>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.addMediaButton} onPress={addVideo}>
+                    <ThemedText style={styles.addMediaIcon}>🎬</ThemedText>
+                    <ThemedText style={styles.addMediaText}>Video</ThemedText>
+                  </TouchableOpacity>
                 </View>
               </View>
-              <TouchableOpacity 
-                style={styles.toggleButton}
-                onPress={() => setIsPublic(!isPublic)}
-              >
-                <View style={[
-                  styles.toggleCircle,
-                  isPublic && styles.toggleCircleActive
-                ]} />
-              </TouchableOpacity>
+              
+              {/* Images Preview */}
+              {selectedImages.length > 0 && (
+                <View style={styles.mediaPreviewSection}>
+                  <ThemedText style={styles.mediaPreviewTitle}>Photos ({selectedImages.length})</ThemedText>
+                  <ScrollView horizontal style={styles.mediaPreviewContainer}>
+                    {selectedImages.map((image, index) => (
+                      <View key={`img-${index}`} style={styles.mediaPreview}>
+                        <ThemedText style={styles.mediaPreviewText}>{image}</ThemedText>
+                        <TouchableOpacity 
+                          style={styles.removeMediaButton}
+                          onPress={() => removeImage(index)}
+                        >
+                          <ThemedText style={styles.removeMediaIcon}>✕</ThemedText>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* Videos Preview */}
+              {selectedVideos.length > 0 && (
+                <View style={styles.mediaPreviewSection}>
+                  <ThemedText style={styles.mediaPreviewTitle}>Videos ({selectedVideos.length})</ThemedText>
+                  <ScrollView horizontal style={styles.mediaPreviewContainer}>
+                    {selectedVideos.map((video, index) => (
+                      <View key={`vid-${index}`} style={[styles.mediaPreview, styles.videoPreview]}>
+                        <ThemedText style={styles.mediaPreviewText}>{video}</ThemedText>
+                        <View style={styles.videoPlayButton}>
+                          <ThemedText style={styles.playIcon}>▶️</ThemedText>
+                        </View>
+                        <TouchableOpacity 
+                          style={styles.removeMediaButton}
+                          onPress={() => removeVideo(index)}
+                        >
+                          <ThemedText style={styles.removeMediaIcon}>✕</ThemedText>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
             </View>
 
-            <View style={styles.optionRow}>
-              <View style={styles.optionLeft}>
-                <ThemedText style={styles.optionIcon}>🏷️</ThemedText>
-                <ThemedText style={styles.optionTitle}>Add Hashtags</ThemedText>
+            {/* Post Options */}
+            <View style={styles.postOptions}>
+              <View style={styles.optionRow}>
+                <View style={styles.optionLeft}>
+                  <ThemedText style={styles.optionIcon}>🌍</ThemedText>
+                  <View>
+                    <ThemedText style={styles.optionTitle}>Public Post</ThemedText>
+                    <ThemedText style={styles.optionDescription}>
+                      Anyone can see this post
+                    </ThemedText>
+                  </View>
+                </View>
+                <TouchableOpacity 
+                  style={styles.toggleButton}
+                  onPress={() => setIsPublic(!isPublic)}
+                >
+                  <View style={[
+                    styles.toggleCircle,
+                    isPublic && styles.toggleCircleActive
+                  ]} />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity style={styles.hashtagButton}>
-                <ThemedText style={styles.hashtagIcon}>#</ThemedText>
-              </TouchableOpacity>
-            </View>
 
-            <View style={styles.optionRow}>
-              <View style={styles.optionLeft}>
-                <ThemedText style={styles.optionIcon}>👥</ThemedText>
-                <ThemedText style={styles.optionTitle}>Mention People</ThemedText>
+              <View style={styles.optionRow}>
+                <View style={styles.optionLeft}>
+                  <ThemedText style={styles.optionIcon}>🏷️</ThemedText>
+                  <ThemedText style={styles.optionTitle}>Add Hashtags</ThemedText>
+                </View>
+                <TouchableOpacity style={styles.hashtagButton}>
+                  <ThemedText style={styles.hashtagIcon}>#</ThemedText>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity style={styles.mentionButton}>
-                <ThemedText style={styles.mentionIcon}>@</ThemedText>
-              </TouchableOpacity>
+
+              <View style={styles.optionRow}>
+                <View style={styles.optionLeft}>
+                  <ThemedText style={styles.optionIcon}>👥</ThemedText>
+                  <ThemedText style={styles.optionTitle}>Mention People</ThemedText>
+                </View>
+                <TouchableOpacity style={styles.mentionButton}>
+                  <ThemedText style={styles.mentionIcon}>@</ThemedText>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          </ScrollView>
         </Animated.View>
-      </TouchableOpacity>
+      </View>
     </Animated.View>
+
   );
 };
 
@@ -252,19 +262,23 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 1000,
+    zIndex: 9999, // Much higher z-index to ensure it appears above all content
+    elevation: 9999, // For Android elevation
   },
   modalBackground: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
+    zIndex: 10000, // Even higher z-index for the background
+    elevation: 10000, // For Android elevation
   },
   createPostModal: {
     backgroundColor: 'white',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: screenHeight * 0.9,
-    minHeight: screenHeight * 0.7,
+    height: screenHeight * 0.85, // Fixed height - 85% of screen height
+    zIndex: 10001, // Highest z-index for the modal content
+    elevation: 10001, // For Android elevation
   },
   modalHeader: {
     flexDirection: 'row',
@@ -274,6 +288,9 @@ const styles = StyleSheet.create({
     paddingTop: 30,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  scrollableContent: {
+    flex: 1,
   },
   cancelButton: {
     fontSize: 16,

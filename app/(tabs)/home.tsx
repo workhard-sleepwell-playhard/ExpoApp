@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, ScrollView, Alert, Animated, Dimensions } from 'react-native';
+import { StyleSheet, ScrollView, View, Alert, Animated, Dimensions } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { ThemedView } from '@/components/themed-view';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -13,12 +13,15 @@ import {
   selectSelectedImages, 
   selectSelectedVideos, 
   selectPostType, 
-  selectIsPublic 
+  selectIsPublic,
+  selectIsLoading,
+  selectError
 } from '../../store/home/home.selector';
 import { 
   openCreatePost, 
   likePost,
   addPost,
+  createPost,
   addImageToPost,
   removeImageFromPost,
   addVideoToPost,
@@ -51,20 +54,23 @@ export default function HomeScreen() {
   const selectedVideos = useSelector(selectSelectedVideos);
   const postType = useSelector(selectPostType);
   const isPublic = useSelector(selectIsPublic);
+  const isLoading = useSelector(selectIsLoading);
+  const error = useSelector(selectError);
   
-  // Animation values
-  const slideAnimation = React.useRef(new Animated.Value(screenHeight)).current;
+  // Animation values - using modal height instead of full screen height
+  const modalHeight = screenHeight * 0.85;
+  const slideAnimation = React.useRef(new Animated.Value(modalHeight)).current;
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
 
-  const handleLike = (postId: number) => {
-    dispatch(likePost(postId));
+  const handleLike = (postId: string | number) => {
+    dispatch(likePost(Number(postId)));
   };
 
-  const handleComment = (postId: number) => {
+  const handleComment = (postId: string | number) => {
     Alert.alert('Comments', `View comments for post ${postId}`);
   };
 
-  const handleShare = (postId: number) => {
+  const handleShare = (postId: string | number) => {
     Alert.alert('Share', `Share post ${postId}`);
   };
 
@@ -87,7 +93,7 @@ export default function HomeScreen() {
   const handleCloseCreatePost = () => {
     Animated.parallel([
       Animated.timing(slideAnimation, {
-        toValue: screenHeight,
+        toValue: modalHeight,
         duration: 300,
         useNativeDriver: true,
       }),
@@ -105,10 +111,14 @@ export default function HomeScreen() {
     });
   };
 
-  const handlePost = () => {
-    if (postContent.trim()) {
+  const handlePost = async () => {
+    if (!postContent.trim()) {
+      Alert.alert('Error', 'Please write something to share!');
+      return;
+    }
+
+    try {
       const newPost = {
-        id: posts.length + 1,
         user: {
           name: 'You',
           avatar: '👤',
@@ -117,20 +127,17 @@ export default function HomeScreen() {
         content: postContent,
         image: selectedImages.length > 0 ? selectedImages[0] : null,
         video: selectedVideos.length > 0 ? selectedVideos[0] : null,
-        timestamp: 'now',
-        likes: 0,
-        comments: 0,
-        shares: 0,
-        isLiked: false,
         type: postType,
         isPublic,
       };
       
-      dispatch(addPost(newPost));
-      handleCloseCreatePost();
-      Alert.alert('Success', 'Your post has been shared!');
-    } else {
-      Alert.alert('Error', 'Please write something to share!');
+      // Use the async thunk function that sends to Firebase
+      await dispatch(createPost(newPost));
+      Alert.alert('Success', 'Your post has been shared to the community!');
+    } catch (error) {
+      console.error('Error creating post:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      Alert.alert('Error', `Failed to create post: ${errorMessage}`);
     }
   };
 
@@ -157,22 +164,24 @@ export default function HomeScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <HomeHeader />
-      <CreatePostButton onPress={handleOpenCreatePost} />
-      
-      {/* Social Posts Feed */}
-      {posts.map((post) => (
-        <PostCard
-          key={post.id}
-          post={post}
-          onLike={handleLike}
-          onComment={handleComment}
-          onShare={handleShare}
-        />
-      ))}
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollView}>
+        <HomeHeader />
+        <CreatePostButton onPress={handleOpenCreatePost} />
+        
+        {/* Social Posts Feed */}
+        {posts.map((post: any) => (
+          <PostCard
+            key={post.id}
+            post={post}
+            onLike={handleLike}
+            onComment={handleComment}
+            onShare={handleShare}
+          />
+        ))}
+      </ScrollView>
 
-      {/* Create Post Modal */}
+      {/* Create Post Modal - Outside ScrollView for independent positioning */}
       <CreatePostModal
         visible={isCreatePostOpen}
         onClose={handleCloseCreatePost}
@@ -189,8 +198,9 @@ export default function HomeScreen() {
         onPost={handlePost}
         slideAnimation={slideAnimation}
         overlayOpacity={overlayOpacity}
+        isLoading={isLoading}
       />
-    </ScrollView>
+    </View>
   );
 }
 
@@ -198,5 +208,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
+  },
+  scrollView: {
+    flex: 1,
   },
 });

@@ -262,7 +262,7 @@ export default function TaskScreen() {
       {/* Other Tasks (Inline Toggleable) */}
       {showOtherTasks && (
         <>
-          {otherTasks.map((task) => (
+          {otherTasks.map((task: any) => (
             <TaskCard
               key={task.id}
               task={task}

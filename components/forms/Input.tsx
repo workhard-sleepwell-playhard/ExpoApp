@@ -25,6 +25,11 @@ export interface InputProps {
   maxLength?: number;
   style?: ViewStyle;
   inputStyle?: TextStyle;
+  // Additional props for auth forms
+  keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad' | 'number-pad';
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  autoComplete?: 'off' | 'email' | 'password' | 'name' | 'new-password';
+  secureTextEntry?: boolean;
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -47,6 +52,10 @@ export const Input: React.FC<InputProps> = ({
   maxLength,
   style,
   inputStyle,
+  keyboardType,
+  autoCapitalize,
+  autoComplete,
+  secureTextEntry,
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -70,7 +79,7 @@ export const Input: React.FC<InputProps> = ({
   };
 
   const getContainerStyles = () => {
-    const baseStyles = [styles.container];
+    const baseStyles: any[] = [styles.container];
     
     if (disabled) baseStyles.push(styles.disabled);
     if (error) baseStyles.push(styles.error);
@@ -78,32 +87,24 @@ export const Input: React.FC<InputProps> = ({
     
     switch (variant) {
       case 'outlined':
-        baseStyles.push([
-          styles.outlined,
-          {
-            borderColor: error ? '#FF3B30' : isFocused ? Colors[colorScheme ?? 'light'].tint : isDark ? '#3A3A3C' : '#E5E5EA',
-          }
-        ]);
+        baseStyles.push(styles.outlined);
+        baseStyles.push({
+          borderColor: error ? '#FF3B30' : isFocused ? Colors[colorScheme ?? 'light'].tint : isDark ? '#3A3A3C' : '#E5E5EA',
+        });
         break;
       case 'filled':
-        baseStyles.push([
-          styles.filled,
-          { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' }
-        ]);
+        baseStyles.push(styles.filled);
+        baseStyles.push({ backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' });
         break;
       case 'underline':
-        baseStyles.push([
-          styles.underline,
-          {
-            borderBottomColor: error ? '#FF3B30' : isFocused ? Colors[colorScheme ?? 'light'].tint : isDark ? '#3A3A3C' : '#E5E5EA',
-          }
-        ]);
+        baseStyles.push(styles.underline);
+        baseStyles.push({
+          borderBottomColor: error ? '#FF3B30' : isFocused ? Colors[colorScheme ?? 'light'].tint : isDark ? '#3A3A3C' : '#E5E5EA',
+        });
         break;
       default:
-        baseStyles.push([
-          styles.default,
-          { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }
-        ]);
+        baseStyles.push(styles.default);
+        baseStyles.push({ backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' });
         break;
     }
     
@@ -111,7 +112,7 @@ export const Input: React.FC<InputProps> = ({
   };
 
   const getInputStyles = () => {
-    const baseStyles = [styles.input];
+    const baseStyles: any[] = [styles.input];
     
     switch (size) {
       case 'small':
@@ -124,9 +125,6 @@ export const Input: React.FC<InputProps> = ({
         baseStyles.push(styles.inputLarge);
         break;
     }
-    
-    if (error) baseStyles.push({ color: '#FF3B30' });
-    if (disabled) baseStyles.push({ color: isDark ? '#8E8E93' : '#8E8E93' });
     
     return baseStyles;
   };
@@ -177,13 +175,20 @@ export const Input: React.FC<InputProps> = ({
         )}
         
         <TextInput
-          style={[getInputStyles(), inputStyle]}
+          style={[
+            getInputStyles(), 
+            inputStyle,
+            error && { color: '#FF3B30' },
+            disabled && { color: isDark ? '#8E8E93' : '#8E8E93' }
+          ]}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
           placeholderTextColor={isDark ? '#8E8E93' : '#8E8E93'}
-          secureTextEntry={type === 'password' && !showPassword}
-          keyboardType={getKeyboardType()}
+          secureTextEntry={secureTextEntry || (type === 'password' && !showPassword)}
+          keyboardType={keyboardType || getKeyboardType()}
+          autoCapitalize={autoCapitalize}
+          autoComplete={autoComplete}
           editable={!disabled}
           multiline={multiline}
           numberOfLines={numberOfLines}

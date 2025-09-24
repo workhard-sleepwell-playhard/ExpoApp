@@ -102,6 +102,72 @@ export const homeReducer = (state = HOME_INITIAL_STATE, action = {}) => {
         isPublic: true,
       }
     
+    // Async action handlers for create post
+    case HOME_ACTION_TYPES.CREATE_POST_REQUEST:
+      return {
+        ...state,
+        isLoading: true,
+        error: null,
+      }
+    
+    case HOME_ACTION_TYPES.CREATE_POST_SUCCESS:
+      return {
+        ...state,
+        isLoading: false,
+        error: null,
+      }
+    
+    case HOME_ACTION_TYPES.CREATE_POST_ERROR:
+      return {
+        ...state,
+        isLoading: false,
+        error: payload,
+      }
+    
+    // Async action handlers for fetch posts
+    case HOME_ACTION_TYPES.FETCH_POSTS_REQUEST:
+      return {
+        ...state,
+        isLoading: true,
+        error: null,
+      }
+    
+    case HOME_ACTION_TYPES.FETCH_POSTS_SUCCESS:
+      return {
+        ...state,
+        isLoading: false,
+        error: null,
+      }
+    
+    case HOME_ACTION_TYPES.FETCH_POSTS_ERROR:
+      return {
+        ...state,
+        isLoading: false,
+        error: payload,
+      }
+    
+    // Async action handlers for delete post
+    case HOME_ACTION_TYPES.DELETE_POST_REQUEST:
+      return {
+        ...state,
+        isLoading: true,
+        error: null,
+      }
+    
+    case HOME_ACTION_TYPES.DELETE_POST_SUCCESS:
+      return {
+        ...state,
+        isLoading: false,
+        error: null,
+      }
+    
+    case HOME_ACTION_TYPES.DELETE_POST_ERROR:
+      return {
+        ...state,
+        isLoading: false,
+        error: payload,
+      }
+    
     default:
       return state
   }

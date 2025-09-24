@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
+import { DeletePostButton } from '@/components/buttons';
 
 interface Post {
-  id: number;
+  id: string | number;
   user: {
     name: string;
     avatar: string;
@@ -23,15 +24,68 @@ interface Post {
 
 interface PostCardProps {
   post: Post;
-  onLike: (postId: number) => void;
-  onComment: (postId: number) => void;
-  onShare: (postId: number) => void;
+  onLike: (postId: string | number) => void;
+  onComment: (postId: string | number) => void;
+  onShare: (postId: string | number) => void;
+  onDelete?: (postId: string | number) => void;
 }
 
-export const PostCard: React.FC<PostCardProps> = ({ post, onLike, onComment, onShare }) => {
+export const PostCard: React.FC<PostCardProps> = ({ post, onLike, onComment, onShare, onDelete }) => {
+  const [showDeleteButton, setShowDeleteButton] = useState(false);
+
+  // Get post type configuration
+  const getPostTypeConfig = (type: string) => {
+    switch (type) {
+      case 'achievement':
+        return {
+          icon: '🏆',
+          label: 'Achievement',
+          color: '#FFD700',
+          backgroundColor: '#FFF9E6',
+          borderColor: '#FFD700'
+        };
+      case 'task':
+        return {
+          icon: '✅',
+          label: 'Task Update',
+          color: '#34C759',
+          backgroundColor: '#E8F5E8',
+          borderColor: '#34C759'
+        };
+      case 'question':
+        return {
+          icon: '❓',
+          label: 'Question',
+          color: '#FF9500',
+          backgroundColor: '#FFF4E6',
+          borderColor: '#FF9500'
+        };
+      default: // general
+        return {
+          icon: '💭',
+          label: 'General',
+          color: '#007AFF',
+          backgroundColor: '#E6F3FF',
+          borderColor: '#007AFF'
+        };
+    }
+  };
+
+  const postTypeConfig = getPostTypeConfig(post.type);
+
   return (
-    <View style={styles.postContainer}>
+    <View style={[styles.postContainer, { borderLeftColor: postTypeConfig.borderColor, borderLeftWidth: 4 }]}>
       <View style={styles.postCard}>
+        {/* Post Type Indicator */}
+        <View style={[styles.postTypeIndicator, { backgroundColor: postTypeConfig.backgroundColor }]}>
+          <View style={styles.postTypeContent}>
+            <ThemedText style={styles.postTypeIcon}>{postTypeConfig.icon}</ThemedText>
+            <ThemedText style={[styles.postTypeLabel, { color: postTypeConfig.color }]}>
+              {postTypeConfig.label}
+            </ThemedText>
+          </View>
+        </View>
+
         {/* Post Header */}
         <View style={styles.postHeader}>
           <View style={styles.userInfo}>
@@ -45,11 +99,26 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onLike, onComment, onS
           </View>
           <View style={styles.postMeta}>
             <ThemedText style={styles.timestamp}>{post.timestamp}</ThemedText>
-            <TouchableOpacity style={styles.moreButton}>
+            <TouchableOpacity 
+              style={styles.moreButton}
+              onPress={() => setShowDeleteButton(!showDeleteButton)}
+            >
               <ThemedText style={styles.moreIcon}>⋯</ThemedText>
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Delete Button (conditional) */}
+        {showDeleteButton && onDelete && (
+          <View style={styles.deleteButtonContainer}>
+            <DeletePostButton
+              postId={post.id.toString()}
+              onDelete={onDelete}
+              size="small"
+              style={styles.deleteButton}
+            />
+          </View>
+        )}
 
         {/* Post Content */}
         <View style={styles.postContentContainer}>
@@ -121,6 +190,26 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 8,
     overflow: 'hidden',
+  },
+  postTypeIndicator: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  postTypeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  postTypeIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  postTypeLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   postHeader: {
     flexDirection: 'row',
@@ -231,5 +320,15 @@ const styles = StyleSheet.create({
   },
   likedText: {
     color: '#FF4500',
+  },
+  deleteButtonContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#FFF5F5',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFE5E5',
+  },
+  deleteButton: {
+    alignSelf: 'flex-start',
   },
 });

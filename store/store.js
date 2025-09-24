@@ -1,17 +1,20 @@
 import {compose, createStore, applyMiddleware} from 'redux';
 import { thunk } from 'redux-thunk';
-import { persistStore, persistReducer } from 'redux-persist';
-import AsyncStorage from '@react-native-async-storage/async-storage';  
+// Temporarily disable Redux Persist to test if this causes the window error
+// import { persistStore, persistReducer } from 'redux-persist';
+// import AsyncStorage from '@react-native-async-storage/async-storage';  
 
 import { rootReducer } from './root-reducer.js';
 
-const persistConfig = {
-    key: 'root',
-    storage: AsyncStorage,
-    blacklist: ['user '] // pass in the values you dont want 
- }
+// Temporarily disable persistence to test if this causes the window error
+// const persistConfig = {
+//     key: 'root',
+//     storage: AsyncStorage,
+//     blacklist: ['user'] // pass in the values you dont want 
+//  }
 
-const persistedReducer = persistReducer(persistConfig, rootReducer);
+// const persistedReducer = persistReducer(persistConfig, rootReducer);
+const persistedReducer = rootReducer; // Use rootReducer directly without persistence
 
 // Create middleware array - ensure all items are functions
 const middleWares = [thunk]
@@ -45,4 +48,6 @@ const composedEnhancers = composeEnhancer(applyMiddleware(...validMiddlewares));
 //pass eveysigle middleware you have
 export const store = createStore(persistedReducer, undefined, composedEnhancers) // stores defaults to persistedReducer
 
-export const persistor = persistStore(store)
+// Temporarily disable persistor to test if this causes the window error
+// export const persistor = persistStore(store)
+export const persistor = null; // No persistence for now

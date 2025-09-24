@@ -73,6 +73,9 @@ export const handleOptionPress = (option) => {
     return toggleNotifications()
   } else if (option.title === 'Edit Profile') {
     return openEditProfile()
+  } else if (option.title === 'Logout') {
+    // This will be handled by the component to dispatch auth actions
+    return { type: 'LOGOUT_REQUESTED' }
   } else {
     console.log(`${option.title} pressed`)
     return { type: 'NO_OP' }
