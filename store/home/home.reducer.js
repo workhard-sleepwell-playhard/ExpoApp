@@ -135,6 +135,7 @@ export const homeReducer = (state = HOME_INITIAL_STATE, action = {}) => {
     case HOME_ACTION_TYPES.FETCH_POSTS_SUCCESS:
       return {
         ...state,
+        posts: payload, // Set the fetched posts
         isLoading: false,
         error: null,
       }

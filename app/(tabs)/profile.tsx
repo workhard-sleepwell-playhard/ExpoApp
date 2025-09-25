@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, ScrollView, View, TouchableOpacity, Switch, Animated, Dimensions } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
+import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -29,7 +30,6 @@ import {
   selectRecentAchievements
 } from '../../store/profile/profile.selector';
 import { 
-  loadUserProfile, 
   handleOptionPress, 
   saveProfileChanges, 
   updateUserAvatar, 
@@ -56,6 +56,7 @@ const { height: screenHeight } = Dimensions.get('window');
 
 export default function ProfileScreen() {
   const dispatch = useDispatch();
+  const router = useRouter();
   const colorScheme = useColorScheme();
   
   // Auth context - now available in any tab!
@@ -83,22 +84,8 @@ export default function ProfileScreen() {
   const profileStats = useSelector(selectProfileStats);
   const recentAchievements = useSelector(selectRecentAchievements);
   
-  // Load initial data when component mounts
-  React.useEffect(() => {
-    // Load user profile data
-    dispatch(loadUserProfile({
-      name: 'John Doe',
-      email: 'john.doe@example.com',
-      joinDate: 'January 2024',
-      avatar: '👨‍💻',
-      stats: {
-        totalTasks: 127,
-        completedTasks: 89,
-        currentStreak: 12,
-        totalPoints: 2847,
-      }
-    }) as any);
-  }, [dispatch]);
+  // Profile data is now fetched automatically via auth flow
+  // No need to manually load profile data here
   
   // Animation values
   const slideAnimation = React.useRef(new Animated.Value(screenHeight)).current;
@@ -172,28 +159,9 @@ export default function ProfileScreen() {
     dispatch(handleEditAvatar() as any);
   };
 
-  const onMyPosts = async () => {
-    try {
-      // For now, we'll fetch posts for the current user
-      // TODO: Get actual current user ID from auth context
-      const currentUserId = 'current-user-id'; // This should come from auth context
-      
-      console.log('Fetching user posts for:', currentUserId);
-      
-      // Fetch user's posts using the thunk function
-      const userPosts = await dispatch(fetchPosts(currentUserId) as any);
-      
-      console.log('User posts fetched:', userPosts.length, 'posts');
-      
-      // TODO: Navigate to My Posts screen or show posts in a modal
-      // For now, we'll just log the results
-      console.log('My Posts', `Found ${userPosts.length} posts. Navigation to My Posts screen will be implemented next.`);
-      
-    } catch (error) {
-      console.error('Error fetching user posts:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      console.error('Failed to fetch posts:', errorMessage);
-    }
+  const onMyPosts = () => {
+    // Navigate to My Posts screen
+    router.push('/my-posts');
   };
 
   return (

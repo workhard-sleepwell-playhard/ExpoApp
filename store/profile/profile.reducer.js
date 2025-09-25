@@ -152,6 +152,51 @@ export const profileReducer = (state = PROFILE_INITIAL_STATE, action = {}) => {
         showEditProfile: false,
       }
     
+    // Firebase Profile Actions
+    case PROFILE_ACTION_TYPES.FETCH_USER_PROFILE_START:
+      return {
+        ...state,
+        isLoading: true,
+        error: null,
+      }
+    
+    case PROFILE_ACTION_TYPES.FETCH_USER_PROFILE_SUCCESS:
+      return {
+        ...state,
+        userData: { ...state.userData, ...payload },
+        isLoading: false,
+        error: null,
+      };
+    
+    case PROFILE_ACTION_TYPES.FETCH_USER_PROFILE_FAILED:
+      return {
+        ...state,
+        isLoading: false,
+        error: payload,
+      }
+    
+    case PROFILE_ACTION_TYPES.UPDATE_USER_PROFILE_START:
+      return {
+        ...state,
+        isLoading: true,
+        error: null,
+      }
+    
+    case PROFILE_ACTION_TYPES.UPDATE_USER_PROFILE_SUCCESS:
+      return {
+        ...state,
+        userData: { ...state.userData, ...payload },
+        isLoading: false,
+        error: null,
+      }
+    
+    case PROFILE_ACTION_TYPES.UPDATE_USER_PROFILE_FAILED:
+      return {
+        ...state,
+        isLoading: false,
+        error: payload,
+      }
+    
     default:
       return state
   }

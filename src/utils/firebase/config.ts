@@ -6,6 +6,7 @@ import { getAuth,
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged, } from 'firebase/auth';
+import { UserService } from '../../services/firebase-service';
 // Note: Storage and Functions might not be needed for basic auth
 // import { getStorage } from 'firebase/storage';
 // import { getFunctions } from 'firebase/functions';
@@ -77,17 +78,19 @@ export const createUserDocumentFromAuth = async (
   if (!userAuth) return;
 
   const userDocRef = doc(db, 'users', userAuth.uid);
-
   const userSnapshot = await getDoc(userDocRef);
 
   if (!userSnapshot.exists()) {
     const { displayName, email } = userAuth;
 
     try {
-      await setDoc(userDocRef, {
-        displayName,
-        email,
-        createdAt: serverTimestamp(),
+      // Use UserService to create a complete user document
+      await UserService.createUser(userAuth.uid, {
+        email: email || '',
+        displayName: displayName || additionalInformation.displayName || '',
+        avatar: additionalInformation.avatar,
+        username: additionalInformation.username,
+        bio: additionalInformation.bio,
         ...additionalInformation,
       });
     } catch (error) {

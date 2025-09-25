@@ -34,15 +34,45 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     if (isLoading) return; // Don't navigate while loading
 
-    const inAuthGroup = segments[0] === 'auth';
-    
-    if (!isAuthenticated && !inAuthGroup) {
-      // User is not authenticated and not on auth screen, redirect to auth
-      router.replace('/auth');
-    } else if (isAuthenticated && inAuthGroup) {
-      // User is authenticated but on auth screen, redirect to home
-      router.replace('/(tabs)/home');
-    }
+    // Add a small delay to ensure the navigation tree is ready
+    const navigationTimer = setTimeout(() => {
+      try {
+        const inAuthGroup = segments[0] === 'auth';
+        const inTabsGroup = segments[0] === '(tabs)';
+        
+        console.log('Navigation check:', { isAuthenticated, segments, inAuthGroup, inTabsGroup });
+        
+        if (!isAuthenticated) {
+          // Not authenticated - go to auth unless already there
+          if (!inAuthGroup) {
+            console.log('Redirecting to auth');
+            router.replace('/auth');
+          }
+        } else {
+          // Authenticated - go to home unless already in tabs or on my-posts
+          if (inAuthGroup || (!inTabsGroup && segments[0] !== 'my-posts')) {
+            console.log('Redirecting to home');
+            router.replace('/(tabs)/home');
+          }
+        }
+      } catch (error) {
+        console.warn('Navigation error:', error);
+        // If navigation fails, try again after a longer delay
+        setTimeout(() => {
+          try {
+            if (!isAuthenticated) {
+              router.replace('/auth');
+            } else {
+              router.replace('/(tabs)/home');
+            }
+          } catch (retryError) {
+            console.error('Navigation retry failed:', retryError);
+          }
+        }, 500);
+      }
+    }, 100); // Small delay to ensure navigation tree is ready
+
+    return () => clearTimeout(navigationTimer);
   }, [isAuthenticated, isLoading, segments, router]);
 
   const value = {

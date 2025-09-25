@@ -7,11 +7,12 @@ import { ThemedView } from '@/components/themed-view';
 
 // Import Redux selectors and actions
 import { 
-  selectPosts,
-  selectIsLoading,
-  selectError
+  selectPosts
 } from '../store/home/home.selector';
-import { fetchPosts, deletePostAsync } from '../store/home/home.action';
+import { deletePostAsync } from '../store/home/home.action';
+
+// Import auth context to get current user
+import { useAuth } from '../components/auth/AuthProvider';
 
 // Import PostCard component
 import { PostCard } from '../components/tabscomponents/home/homePostCard.component';
@@ -20,29 +21,24 @@ export default function MyPostsScreen() {
   const router = useRouter();
   const dispatch = useDispatch();
   
+  // Auth context
+  const { currentUser } = useAuth();
+  
   // Redux state
   const posts = useSelector(selectPosts);
-  const isLoading = useSelector(selectIsLoading);
-  const error = useSelector(selectError);
+  // Don't use isLoading/error from Redux - those are for home page fetch
+  // My Posts just filters existing data, so no loading/error states needed
 
-  // Load user posts when component mounts
-  useEffect(() => {
-    loadUserPosts();
-  }, []);
+  // Filter user posts from existing Redux state (no additional API call needed)
+  const userPosts = React.useMemo(() => {
+    if (!currentUser?.uid) return [];
+    
+    // Filter posts to show only current user's posts
+    return posts.filter((post: any) => post.userId === currentUser.uid);
+  }, [posts, currentUser]);
 
-  const loadUserPosts = async () => {
-    try {
-      // TODO: Get actual current user ID from auth context
-      const currentUserId = 'current-user-id';
-      
-      console.log('Loading user posts for:', currentUserId);
-      await dispatch(fetchPosts(currentUserId) as any);
-    } catch (error) {
-      console.error('Error loading user posts:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      Alert.alert('Error', `Failed to load posts: ${errorMessage}`);
-    }
-  };
+  // No need to fetch data - we filter from existing state
+  // The home page already fetches all posts, so we just filter them here
 
   const handleLike = (postId: string | number) => {
     // TODO: Implement like functionality
@@ -66,8 +62,8 @@ export default function MyPostsScreen() {
       // Show success message
       Alert.alert('Success', 'Post deleted successfully!');
       
-      // Refresh the posts list
-      await loadUserPosts();
+      // No need to refresh - the Redux state will update automatically
+      // and our useMemo will re-filter the posts
     } catch (error) {
       console.error('Error deleting post:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -92,37 +88,20 @@ export default function MyPostsScreen() {
 
       {/* Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ThemedText style={styles.loadingText}>Loading your posts...</ThemedText>
-          </View>
-        ) : error ? (
-          <View style={styles.errorContainer}>
-            <ThemedText style={styles.errorText}>Error: {error}</ThemedText>
-            <TouchableOpacity onPress={loadUserPosts} style={styles.retryButton}>
-              <ThemedText style={styles.retryButtonText}>Retry</ThemedText>
-            </TouchableOpacity>
-          </View>
-        ) : posts.length === 0 ? (
+        {userPosts.length === 0 ? (
           <View style={styles.emptyContainer}>
             <ThemedText style={styles.emptyIcon}>📝</ThemedText>
             <ThemedText style={styles.emptyTitle}>No Posts Yet</ThemedText>
             <ThemedText style={styles.emptyDescription}>
-              You haven't created any posts yet. Start sharing your thoughts and achievements!
+              You haven't created any posts yet.
             </ThemedText>
-            <TouchableOpacity 
-              onPress={() => router.push('/(tabs)/home')} 
-              style={styles.createPostButton}
-            >
-              <ThemedText style={styles.createPostButtonText}>Create Your First Post</ThemedText>
-            </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.postsContainer}>
             <ThemedText style={styles.postsCount}>
-              {posts.length} {posts.length === 1 ? 'Post' : 'Posts'}
+              {userPosts.length} {userPosts.length === 1 ? 'Post' : 'Posts'}
             </ThemedText>
-            {posts.map((post: any) => (
+            {userPosts.map((post: any) => (
               <PostCard
                 key={post.id}
                 post={post}

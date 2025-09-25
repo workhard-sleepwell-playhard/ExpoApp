@@ -7,6 +7,7 @@ import {
   createUserDocumentFromAuth,
   onAuthStateChangedListener
 } from '../../src/utils/firebase/config';
+import { fetchUserProfile } from '../profile/profile.action';
 
 // Basic action creators
 export const setCurrentUser = (user) => ({
@@ -49,9 +50,11 @@ export const checkUserSession = () => {
     dispatch(setLoading(true));
     
     // Enable auth state listener for real authentication
-    onAuthStateChangedListener((user) => {
+    onAuthStateChangedListener(async (user) => {
       if (user) {
         dispatch(setCurrentUser(user));
+        // Fetch user profile from Firebase using uid
+        dispatch(fetchUserProfile(user.uid));
       } else {
         dispatch(setCurrentUser(null));
       }
@@ -73,6 +76,8 @@ export const signUpStart = (email, password, displayName) => {
         type: AUTH_ACTION_TYPES.SIGN_UP_SUCCESS
       });
       dispatch(setCurrentUser(user));
+      // Fetch user profile from Firebase
+      dispatch(fetchUserProfile(user.uid));
       
       return user;
     } catch (error) {
@@ -98,6 +103,8 @@ export const signInStart = (email, password) => {
         type: AUTH_ACTION_TYPES.SIGN_IN_SUCCESS
       });
       dispatch(setCurrentUser(user));
+      // Fetch user profile from Firebase
+      dispatch(fetchUserProfile(user.uid));
       
       return user;
     } catch (error) {
@@ -124,6 +131,8 @@ export const signInWithGoogle = () => {
         type: AUTH_ACTION_TYPES.GOOGLE_SIGN_IN_SUCCESS
       });
       dispatch(setCurrentUser(user));
+      // Fetch user profile from Firebase
+      dispatch(fetchUserProfile(user.uid));
       
       return user;
     } catch (error) {

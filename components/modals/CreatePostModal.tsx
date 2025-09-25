@@ -2,7 +2,8 @@ import React from 'react';
 import { StyleSheet, ScrollView, View, TouchableOpacity, TextInput, Animated, Dimensions } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 
-const { height: screenHeight } = Dimensions.get('screen');
+// Get screen dimensions properly for Expo/React Native
+const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
 interface CreatePostModalProps {
   visible: boolean;
@@ -71,7 +72,13 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
         <Animated.View 
           style={[
             styles.createPostModal,
-            { transform: [{ translateY: slideAnimation }] }
+            { 
+              transform: [{ translateY: slideAnimation }],
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+            }
           ]}
         >
           {/* Modal Header - Fixed */}
@@ -264,6 +271,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 9999, // Much higher z-index to ensure it appears above all content
     elevation: 9999, // For Android elevation
+    width: '100%',
+    height: '100%',
   },
   modalBackground: {
     flex: 1,
@@ -279,6 +288,7 @@ const styles = StyleSheet.create({
     height: screenHeight * 0.85, // Fixed height - 85% of screen height
     zIndex: 10001, // Highest z-index for the modal content
     elevation: 10001, // For Android elevation
+    width: '100%',
   },
   modalHeader: {
     flexDirection: 'row',

@@ -2,7 +2,7 @@ import { AUTH_ACTION_TYPES } from './auth.types';
 
 const AUTH_INITIAL_STATE = {
   currentUser: null,
-  isLoading: false,
+  isLoading: true, // Start with loading true to prevent premature navigation
   error: null,
   // Form data
   signUpFormData: {

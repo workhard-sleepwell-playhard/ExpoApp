@@ -85,9 +85,15 @@ export const createPost = (postData) => {
         mediaData.videos = [postData.video];
       }
 
+      // Get current user from auth state
+      const currentUser = getState().auth.currentUser;
+      if (!currentUser?.uid) {
+        throw new Error('No authenticated user found');
+      }
+
       // Prepare Firebase post data, filtering out undefined values
       const firebasePostData = {
-        userId: 'current-user-id', // TODO: Get from auth context
+        userId: currentUser.uid, // Use actual user UID
         userDisplayName: postData.user.name,
         userAvatar: postData.user.avatar,
         userUsername: postData.user.username,
@@ -191,7 +197,7 @@ export const deletePostAsync = (postId) => {
 }
 
 // Async thunk function for fetching posts with Firebase integration
-export const fetchPosts = (userId) => {
+export const fetchPosts = (userId = null) => {
   return async (dispatch, getState) => {
     try {
       // Dispatch REQUEST action to show loading state
@@ -203,9 +209,11 @@ export const fetchPosts = (userId) => {
       
       if (userId) {
         // Fetch posts by specific user
+        console.log('Fetching posts for user:', userId);
         posts = await PostService.getPostsByUser(userId, 50)
       } else {
         // Fetch all public posts
+        console.log('Fetching all public posts');
         posts = await PostService.getPosts(50)
       }
 
@@ -213,6 +221,7 @@ export const fetchPosts = (userId) => {
       const transformedPosts = posts.map(firebasePost => ({
         id: firebasePost.postId, // Use Firebase document ID as local id
         postId: firebasePost.postId, // Keep Firebase document ID for deletion
+        userId: firebasePost.userId, // Add userId for filtering
         user: {
           name: firebasePost.userDisplayName,
           avatar: firebasePost.userAvatar || '👤',

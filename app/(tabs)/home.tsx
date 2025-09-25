@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, ScrollView, View, Alert, Animated, Dimensions } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { ThemedView } from '@/components/themed-view';
@@ -31,7 +31,8 @@ import {
   setIsPublic,
   setIsCreatePostOpen,
   setSelectedImages,
-  setSelectedVideos
+  setSelectedVideos,
+  fetchPosts
 } from '../../store/home/home.action';
 
 // Import new components
@@ -40,7 +41,8 @@ import { CreatePostButton } from '../../components/tabscomponents/home/homeCreat
 import { PostCard } from '../../components/tabscomponents/home/homePostCard.component';
 import { CreatePostModal } from '@/components/modals/CreatePostModal';
 
-const { height: screenHeight } = Dimensions.get('window');
+// Get screen dimensions properly for Expo/React Native
+const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const dispatch = useDispatch();
@@ -58,9 +60,39 @@ export default function HomeScreen() {
   const error = useSelector(selectError);
   
   // Animation values - using modal height instead of full screen height
-  const modalHeight = screenHeight * 0.85;
+  const [modalHeight, setModalHeight] = React.useState(screenHeight * 0.85);
   const slideAnimation = React.useRef(new Animated.Value(modalHeight)).current;
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
+
+  // Reset animation values when component mounts to ensure proper initial state
+  React.useEffect(() => {
+    // Get fresh screen dimensions to ensure accuracy on mobile devices
+    const { height: currentScreenHeight } = Dimensions.get('window');
+    const currentModalHeight = currentScreenHeight * 0.85;
+    
+    // Update modal height state
+    setModalHeight(currentModalHeight);
+    
+    // Set initial values for the animation
+    slideAnimation.setValue(currentModalHeight);
+    overlayOpacity.setValue(0);
+    
+    console.log('Animation initialized:', { currentScreenHeight, currentModalHeight });
+  }, [slideAnimation, overlayOpacity]);
+
+  // Fetch all posts when component mounts
+  useEffect(() => {
+    loadAllPosts();
+  }, []);
+
+  const loadAllPosts = async () => {
+    try {
+      // Fetch all public posts (no userId parameter)
+      await dispatch(fetchPosts() as any);
+    } catch (error) {
+      console.error('Error loading posts:', error);
+    }
+  };
 
   const handleLike = (postId: string | number) => {
     dispatch(likePost(Number(postId)));
