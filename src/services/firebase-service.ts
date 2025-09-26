@@ -682,14 +682,17 @@ export interface TaskCompletionAnalytics {
 export class UserService {
   // Create a new user with default values
   static async createUser(userId: string, userData: Partial<User>): Promise<void> {
+    console.log('Creating user document for:', userId, 'with data:', userData);
+    console.log('displayName from userData:', userData.displayName);
+    console.log('email from userData:', userData.email);
     const userRef = doc(db, 'users', userId);
     const defaultUser: Partial<User> = {
       userId,
       email: userData.email || '',
       displayName: userData.displayName || '',
-      avatar: userData.avatar,
-      username: userData.username,
-      bio: userData.bio,
+      avatar: userData.avatar || '',
+      username: userData.username || '',
+      bio: userData.bio || '',
       isActive: true,
       preferences: {
         theme: 'auto',
@@ -764,14 +767,14 @@ export class UserService {
         peakProductivityTimes: []
       },
       goals: {
-        dailyTaskGoal: 5,
-        weeklyTaskGoal: 25,
-        monthlyTaskGoal: 100,
-        dailyTimeGoal: 240, // 4 hours
-        weeklyTimeGoal: 1200, // 20 hours
-        socialEngagementGoal: 3, // posts per week
-        streakGoal: 7, // days
-        achievementGoal: 2 // badges per month
+        dailyTaskGoal: userData.goals?.dailyTaskGoal || 5,
+        weeklyTaskGoal: userData.goals?.weeklyTaskGoal || 25,
+        monthlyTaskGoal: userData.goals?.monthlyTaskGoal || 100,
+        dailyTimeGoal: userData.goals?.dailyTimeGoal || 240, // 4 hours
+        weeklyTimeGoal: userData.goals?.weeklyTimeGoal || 1200, // 20 hours
+        socialEngagementGoal: userData.goals?.socialEngagementGoal || 3, // posts per week
+        streakGoal: userData.goals?.streakGoal || 7, // days
+        achievementGoal: userData.goals?.achievementGoal || 2 // badges per month
       },
       settings: {
         pomodoroLength: 25,
@@ -823,10 +826,26 @@ export class UserService {
       lastActiveAt: serverTimestamp()
     };
 
-    await setDoc(userRef, {
-      ...defaultUser,
-      ...userData
-    });
+    try {
+      // Clean up undefined values before saving to Firebase
+      const userDataToSave: any = {
+        ...defaultUser,
+        ...userData
+      };
+      
+      // Remove any undefined values
+      Object.keys(userDataToSave).forEach(key => {
+        if (userDataToSave[key] === undefined) {
+          delete userDataToSave[key];
+        }
+      });
+      
+      await setDoc(userRef, userDataToSave);
+      console.log('User document created successfully for:', userId);
+    } catch (error) {
+      console.error('Error creating user document:', error);
+      throw error;
+    }
   }
 
   // Get user data
@@ -916,28 +935,19 @@ export class UserService {
     });
   }
 
-  // Get user leaderboard data
-  static async getLeaderboardData(limitCount: number = 50): Promise<User[]> {
-    const usersRef = collection(db, 'users');
-    const q = query(
-      usersRef,
-      orderBy('achievements.totalPoints', 'desc'),
-      limit(limitCount)
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ userId: doc.id, ...doc.data() } as User));
-  }
-
-  // Get users by activity level
-  static async getMostActiveUsers(limitCount: number = 50): Promise<User[]> {
-    const usersRef = collection(db, 'users');
-    const q = query(
-      usersRef,
-      orderBy('taskStats.productivityScore', 'desc'),
-      limit(limitCount)
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ userId: doc.id, ...doc.data() } as User));
+  // Get all users (for leaderboards - reuses existing data)
+  static async getAllUsers(limitCount: number = 50): Promise<User[]> {
+    try {
+      const usersRef = collection(db, 'users');
+      const querySnapshot = await getDocs(usersRef);
+      const users = querySnapshot.docs.map(doc => ({ userId: doc.id, ...doc.data() } as User));
+      
+      // Return limited results
+      return users.slice(0, limitCount);
+    } catch (error) {
+      console.error('Error fetching all users:', error);
+      return [];
+    }
   }
 
   // Listen to user changes in real-time

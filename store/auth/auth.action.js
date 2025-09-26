@@ -53,8 +53,17 @@ export const checkUserSession = () => {
     onAuthStateChangedListener(async (user) => {
       if (user) {
         dispatch(setCurrentUser(user));
-        // Fetch user profile from Firebase using uid
-        dispatch(fetchUserProfile(user.uid));
+        
+        // Always ensure user document exists (create if missing)
+        try {
+          await createUserDocumentFromAuth(user);
+          // Fetch user profile from Firebase using uid
+          dispatch(fetchUserProfile(user.uid));
+        } catch (error) {
+          console.error('Error ensuring user document exists:', error);
+          // Still fetch profile in case document exists but creation failed
+          dispatch(fetchUserProfile(user.uid));
+        }
       } else {
         dispatch(setCurrentUser(null));
       }
@@ -70,7 +79,13 @@ export const signUpStart = (email, password, displayName) => {
       dispatch({ type: AUTH_ACTION_TYPES.SIGN_UP_START });
       
       const { user } = await createAuthUserWithEmailAndPassword(email, password);
-      await createUserDocumentFromAuth(user, { displayName });
+      
+      // Ensure user document exists (create if missing)
+      try {
+        await createUserDocumentFromAuth(user, { displayName });
+      } catch (error) {
+        console.error('Error ensuring user document exists during sign up:', error);
+      }
       
       dispatch({ 
         type: AUTH_ACTION_TYPES.SIGN_UP_SUCCESS
@@ -103,6 +118,14 @@ export const signInStart = (email, password) => {
         type: AUTH_ACTION_TYPES.SIGN_IN_SUCCESS
       });
       dispatch(setCurrentUser(user));
+      
+      // Ensure user document exists (create if missing)
+      try {
+        await createUserDocumentFromAuth(user);
+      } catch (error) {
+        console.error('Error ensuring user document exists during sign in:', error);
+      }
+      
       // Fetch user profile from Firebase
       dispatch(fetchUserProfile(user.uid));
       
@@ -125,7 +148,13 @@ export const signInWithGoogle = () => {
       dispatch({ type: AUTH_ACTION_TYPES.GOOGLE_SIGN_IN_START });
       
       const { user } = await signInWithGooglePopup();
-      await createUserDocumentFromAuth(user);
+      
+      // Ensure user document exists (create if missing)
+      try {
+        await createUserDocumentFromAuth(user);
+      } catch (error) {
+        console.error('Error ensuring user document exists during Google sign in:', error);
+      }
       
       dispatch({ 
         type: AUTH_ACTION_TYPES.GOOGLE_SIGN_IN_SUCCESS

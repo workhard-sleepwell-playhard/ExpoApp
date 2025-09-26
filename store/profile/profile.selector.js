@@ -18,8 +18,8 @@ export const selectAchievements = createSelector(
 )
 
 export const selectNotificationsEnabled = createSelector(
-  [selectProfileReducer],
-  (profile) => profile.notificationsEnabled
+  [selectUserData],
+  (userData) => userData.notificationsEnabled
 )
 
 export const selectShowSettings = createSelector(
@@ -109,4 +109,25 @@ export const selectProfileStats = createSelector(
 export const selectRecentAchievements = createSelector(
   [selectAchievements],
   (achievements) => achievements.slice(0, 3) // Show only recent 3 achievements
+)
+
+// User Settings Selectors
+export const selectUserTheme = createSelector(
+  [selectUserData],
+  (userData) => userData.theme
+)
+
+export const selectUserPrivacy = createSelector(
+  [selectUserData],
+  (userData) => userData.privacy
+)
+
+export const selectUserLanguage = createSelector(
+  [selectUserData],
+  (userData) => userData.language
+)
+
+export const selectUserTimezone = createSelector(
+  [selectUserData],
+  (userData) => userData.timezone
 )

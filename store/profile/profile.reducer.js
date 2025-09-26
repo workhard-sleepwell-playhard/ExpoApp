@@ -11,35 +11,15 @@ export const PROFILE_INITIAL_STATE = {
       completedTasks: 0,
       currentStreak: 0,
       totalPoints: 0,
-    }
+    },
+    // User settings from Firebase
+    notificationsEnabled: true,
+    theme: 'auto',
+    privacy: 'public',
+    language: 'en',
+    timezone: 'UTC'
   },
-  achievements: [
-    {
-      id: 1,
-      title: 'Streak Master',
-      description: '15-day streak achieved!',
-      icon: 'trophy.fill',
-      color: '#FFD700',
-      date: '2 days ago'
-    },
-    {
-      id: 2,
-      title: 'Task Master',
-      description: '100 tasks completed!',
-      icon: 'checkmark.seal.fill',
-      color: '#34C759',
-      date: '1 week ago'
-    },
-    {
-      id: 3,
-      title: 'Early Bird',
-      description: '5 tasks before 9 AM',
-      icon: 'sunrise.fill',
-      color: '#007AFF',
-      date: '2 weeks ago'
-    }
-  ],
-  notificationsEnabled: true,
+  achievements: [], // Will be populated from Firebase user data
   showSettings: false,
   showEditProfile: false,
   isLoading: false,
@@ -164,6 +144,7 @@ export const profileReducer = (state = PROFILE_INITIAL_STATE, action = {}) => {
       return {
         ...state,
         userData: { ...state.userData, ...payload },
+        achievements: payload.achievements || [],
         isLoading: false,
         error: null,
       };

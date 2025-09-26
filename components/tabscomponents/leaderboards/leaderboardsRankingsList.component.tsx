@@ -1,14 +1,19 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 
 interface Ranking {
-  id: number;
+  id: string;
   name: string;
   initials: string;
+  avatar?: string;
   totalPoints: number;
+  weeklyPoints: number;
+  currentStreak: number;
+  bestStreak: number;
   rank: number;
+  isCurrentUser?: boolean;
 }
 
 interface RankingsListProps {
@@ -49,43 +54,53 @@ export const RankingsList: React.FC<RankingsListProps> = ({
       
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
-        <View style={[styles.tab, selectedTab === 'overall' && styles.activeTab]}>
+        <TouchableOpacity 
+          style={[styles.tab, selectedTab === 'overall' && styles.activeTab]}
+          onPress={() => onTabChange('overall')}
+        >
           <ThemedText style={[
             styles.tabText, 
             selectedTab === 'overall' && styles.activeTabText
           ]}>
             Overall
           </ThemedText>
-        </View>
+        </TouchableOpacity>
         
-        <View style={[styles.tab, selectedTab === 'weekly' && styles.activeTab]}>
+        <TouchableOpacity 
+          style={[styles.tab, selectedTab === 'weekly' && styles.activeTab]}
+          onPress={() => onTabChange('weekly')}
+        >
           <ThemedText style={[
             styles.tabText, 
             selectedTab === 'weekly' && styles.activeTabText
           ]}>
             Weekly
           </ThemedText>
-        </View>
+        </TouchableOpacity>
         
-        <View style={[styles.tab, selectedTab === 'streaks' && styles.activeTab]}>
+        <TouchableOpacity 
+          style={[styles.tab, selectedTab === 'streaks' && styles.activeTab]}
+          onPress={() => onTabChange('streaks')}
+        >
           <ThemedText style={[
             styles.tabText, 
             selectedTab === 'streaks' && styles.activeTabText
           ]}>
             Streaks
           </ThemedText>
-        </View>
+        </TouchableOpacity>
       </View>
 
       {/* Leaderboard List */}
       <View style={styles.leaderboardList}>
         {rankings.map((user) => (
-          <View key={user.id} style={[
-            styles.leaderboardItem,
-            user.rank <= 3 && styles.topThreeItem,
+          <ThemedView key={user.id} style={[
+            styles.userCard,
+            user.rank <= 3 && styles.topThreeCard,
+            user.isCurrentUser && styles.currentUserCard,
             { backgroundColor: getRankBackgroundColor(user.rank) }
           ]}>
-            {/* Rank Icon/Number */}
+            {/* Rank Section */}
             <View style={styles.rankSection}>
               {user.rank === 1 ? (
                 <ThemedText style={styles.rankEmoji}>👑</ThemedText>
@@ -101,15 +116,59 @@ export const RankingsList: React.FC<RankingsListProps> = ({
             </View>
 
             {/* Avatar */}
-            <View style={styles.avatarContainer}>
-              <ThemedText style={styles.avatarText}>{user.initials}</ThemedText>
+            <View style={[
+              styles.avatarContainer,
+              user.isCurrentUser && styles.currentUserAvatar
+            ]}>
+              <ThemedText style={[
+                styles.avatarText,
+                user.isCurrentUser && styles.currentUserAvatarText
+              ]}>
+                {user.avatar || user.initials}
+              </ThemedText>
             </View>
 
-            {/* User Info and Points */}
+            {/* User Info */}
             <View style={styles.userInfo}>
-              <ThemedText style={styles.userName}>{user.name} - 🏆 {user.totalPoints}</ThemedText>
+              <View style={styles.userNameRow}>
+                <ThemedText style={[
+                  styles.userName,
+                  user.isCurrentUser && styles.currentUserName
+                ]}>
+                  {user.name}
+                </ThemedText>
+                {user.isCurrentUser && (
+                  <ThemedText style={styles.youBadge}>YOU</ThemedText>
+                )}
+              </View>
+              
+              {/* Stats based on selected tab */}
+              <View style={styles.userStats}>
+                {selectedTab === 'overall' && (
+                  <ThemedText style={styles.statText}>
+                    🏆 {user.totalPoints.toLocaleString()} points
+                  </ThemedText>
+                )}
+                {selectedTab === 'weekly' && (
+                  <ThemedText style={styles.statText}>
+                    📈 {user.weeklyPoints} this week
+                  </ThemedText>
+                )}
+                {selectedTab === 'streaks' && (
+                  <ThemedText style={styles.statText}>
+                    🔥 {user.currentStreak} day streak
+                  </ThemedText>
+                )}
+              </View>
+              
+              {/* Additional info */}
+              <View style={styles.additionalInfo}>
+                <ThemedText style={styles.additionalText}>
+                  Best: {user.bestStreak} days
+                </ThemedText>
+              </View>
             </View>
-          </View>
+          </ThemedView>
         ))}
       </View>
     </ThemedView>
@@ -168,54 +227,109 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   leaderboardList: {
-    gap: 8,
+    gap: 12,
   },
-  leaderboardItem: {
+  // Enhanced User Card Styles
+  userCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginHorizontal: -12,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  topThreeItem: {
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
+  topThreeCard: {
+    borderWidth: 2,
+    borderColor: '#FFD700',
+    shadowOpacity: 0.2,
+    elevation: 4,
+  },
+  currentUserCard: {
+    borderWidth: 2,
+    borderColor: '#007AFF',
+    backgroundColor: '#F0F8FF',
   },
   rankSection: {
-    width: 32,
+    width: 40,
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   rankNumber: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
   },
   rankEmoji: {
-    fontSize: 24,
+    fontSize: 28,
   },
   avatarContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#E0E0E0',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
+  },
+  currentUserAvatar: {
+    backgroundColor: '#007AFF',
   },
   avatarText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     color: '#666666',
+  },
+  currentUserAvatarText: {
+    color: '#FFFFFF',
   },
   userInfo: {
     flex: 1,
   },
+  userNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   userName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#333333',
+    flex: 1,
+  },
+  currentUserName: {
+    color: '#007AFF',
+  },
+  youBadge: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  userStats: {
+    marginBottom: 4,
+  },
+  statText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666666',
+  },
+  additionalInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  additionalText: {
+    fontSize: 12,
+    color: '#999999',
+    fontStyle: 'italic',
   },
 });

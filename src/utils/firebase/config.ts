@@ -75,27 +75,47 @@ export const createUserDocumentFromAuth = async (
   userAuth: any,
   additionalInformation: any = {}
 ) => {
-  if (!userAuth) return;
+  console.log('createUserDocumentFromAuth called with:', userAuth?.uid, additionalInformation);
+  console.log('userAuth.displayName:', userAuth?.displayName);
+  console.log('userAuth.email:', userAuth?.email);
+  console.log('additionalInformation:', additionalInformation);
+  
+  if (!userAuth) {
+    console.log('No userAuth provided');
+    return;
+  }
 
   const userDocRef = doc(db, 'users', userAuth.uid);
   const userSnapshot = await getDoc(userDocRef);
 
+  console.log('User document exists:', userSnapshot.exists());
+
   if (!userSnapshot.exists()) {
     const { displayName, email } = userAuth;
+    console.log('Creating new user document for:', userAuth.uid);
 
     try {
       // Use UserService to create a complete user document
+      // For sign-in users without displayName, use email prefix as fallback
+      const fallbackDisplayName = additionalInformation.displayName || 
+                                 displayName || 
+                                 (email ? email.split('@')[0] : 'User');
+      
       await UserService.createUser(userAuth.uid, {
         email: email || '',
-        displayName: displayName || additionalInformation.displayName || '',
-        avatar: additionalInformation.avatar,
-        username: additionalInformation.username,
-        bio: additionalInformation.bio,
+        displayName: fallbackDisplayName,
+        avatar: additionalInformation.avatar || '',
+        username: additionalInformation.username || '',
+        bio: additionalInformation.bio || '',
         ...additionalInformation,
       });
+      console.log('User document creation completed successfully');
     } catch (error) {
-      console.log('error creating the user', (error as Error).message);
+      console.error('Error creating the user:', error);
+      throw error; // Re-throw to let the calling code handle it
     }
+  } else {
+    console.log('User document already exists, skipping creation');
   }
 
   return userDocRef;

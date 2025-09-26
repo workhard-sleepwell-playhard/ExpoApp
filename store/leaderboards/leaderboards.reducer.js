@@ -36,6 +36,7 @@ export const leaderboardsReducer = (state = LEADERBOARDS_INITIAL_STATE, action =
       return {
         ...state,
         rankings: { ...state.rankings, ...payload },
+        lastUpdated: new Date().toISOString(),
       }
     
     case LEADERBOARDS_ACTION_TYPES.SET_SELECTED_TAB:
@@ -51,6 +52,7 @@ export const leaderboardsReducer = (state = LEADERBOARDS_INITIAL_STATE, action =
           ...state.rankings,
           overall: payload,
         },
+        lastUpdated: new Date().toISOString(),
       }
     
     case LEADERBOARDS_ACTION_TYPES.SET_WEEKLY_RANKINGS:
@@ -60,6 +62,7 @@ export const leaderboardsReducer = (state = LEADERBOARDS_INITIAL_STATE, action =
           ...state.rankings,
           weekly: payload,
         },
+        lastUpdated: new Date().toISOString(),
       }
     
     case LEADERBOARDS_ACTION_TYPES.SET_STREAKS_RANKINGS:
@@ -69,6 +72,7 @@ export const leaderboardsReducer = (state = LEADERBOARDS_INITIAL_STATE, action =
           ...state.rankings,
           streaks: payload,
         },
+        lastUpdated: new Date().toISOString(),
       }
     
     case LEADERBOARDS_ACTION_TYPES.SET_IS_LOADING:
@@ -107,6 +111,7 @@ export const leaderboardsReducer = (state = LEADERBOARDS_INITIAL_STATE, action =
         ...state,
         lastUpdated: new Date().toISOString(),
         isLoading: true,
+        error: null,
       }
     
     default:

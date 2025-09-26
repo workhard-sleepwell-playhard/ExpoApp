@@ -27,7 +27,9 @@ import {
   selectTotalPoints,
   selectProfileOptions,
   selectProfileStats,
-  selectRecentAchievements
+  selectRecentAchievements,
+  selectIsLoading,
+  selectError
 } from '../../store/profile/profile.selector';
 import { 
   handleOptionPress, 
@@ -41,7 +43,11 @@ import {
   closeSettings,
   openEditProfile,
   closeEditProfile,
-  toggleNotifications
+  toggleNotifications,
+  fetchUserProfile,
+  updateUserNameWithSync,
+  updateUserAvatarWithSync,
+  toggleNotificationsWithSync
 } from '../../store/profile/profile.action';
 import { fetchPosts } from '../../store/home/home.action';
 import { signOutStart } from '../../store/auth/auth.action';
@@ -60,7 +66,7 @@ export default function ProfileScreen() {
   const colorScheme = useColorScheme();
   
   // Auth context - now available in any tab!
-  const { isAuthenticated, isLoading, currentUser } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, currentUser } = useAuth();
   
   // Confirmation modal state
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
@@ -83,6 +89,8 @@ export default function ProfileScreen() {
   const profileOptions = useSelector(selectProfileOptions);
   const profileStats = useSelector(selectProfileStats);
   const recentAchievements = useSelector(selectRecentAchievements);
+  const isLoading = useSelector(selectIsLoading);
+  const error = useSelector(selectError);
   
   // Profile data is now fetched automatically via auth flow
   // No need to manually load profile data here
@@ -164,6 +172,34 @@ export default function ProfileScreen() {
     router.push('/my-posts');
   };
 
+  // Show loading state
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ThemedText>Loading profile...</ThemedText>
+      </View>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <ThemedText style={styles.errorText}>Error loading profile: {error}</ThemedText>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={() => {
+            if (currentUser?.uid) {
+              dispatch(fetchUserProfile(currentUser.uid) as any);
+            }
+          }}
+        >
+          <ThemedText style={styles.retryButtonText}>Retry</ThemedText>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={styles.container}>
       <ProfileHeader 
@@ -178,7 +214,7 @@ export default function ProfileScreen() {
           Authenticated: {isAuthenticated ? '✅ Yes' : '❌ No'}
         </ThemedText>
         <ThemedText style={styles.authStateText}>
-          Loading: {isLoading ? '⏳ Yes' : '✅ No'}
+          Auth Loading: {authLoading ? '⏳ Yes' : '✅ No'}
         </ThemedText>
         <ThemedText style={styles.authStateText}>
           User: {currentUser ? currentUser.email || 'Logged in' : 'Not logged in'}
@@ -273,7 +309,13 @@ export default function ProfileScreen() {
                     {option.action === 'toggle' ? (
                       <Switch
                         value={option.id === 2 ? notificationsEnabled : false}
-                        onValueChange={() => dispatch(toggleNotifications() as any)}
+                        onValueChange={() => {
+                          if (currentUser?.uid) {
+                            dispatch(toggleNotificationsWithSync(currentUser.uid, !notificationsEnabled) as any);
+                          } else {
+                            dispatch(toggleNotifications() as any);
+                          }
+                        }}
                         trackColor={{ false: '#767577', true: Colors[colorScheme ?? 'light'].tint }}
                         thumbColor={notificationsEnabled ? '#f4f3f4' : '#f4f3f4'}
                       />
@@ -351,7 +393,16 @@ export default function ProfileScreen() {
                     </View>
                   </View>
 
-                  <TouchableOpacity style={styles.saveButton}>
+                  <TouchableOpacity 
+                    style={styles.saveButton}
+                    onPress={() => {
+                      if (currentUser?.uid) {
+                        // Here you would typically get the updated values from form inputs
+                        // For now, we'll just close the modal
+                        dispatch(closeEditProfile() as any);
+                      }
+                    }}
+                  >
                     <ThemedText style={styles.saveButtonText}>Save Changes</ThemedText>
                   </TouchableOpacity>
                 </View>
@@ -638,5 +689,35 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginVertical: 2,
     color: '#495057',
+  },
+  // Loading and Error States
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#FF3B30',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
