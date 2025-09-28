@@ -27,7 +27,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
   const isDark = colorScheme === 'dark';
 
   const getButtonStyles = () => {
-    const baseStyles = [styles.button, styles[size]];
+    const baseStyles: any[] = [styles.button, styles[size]];
     
     if (disabled) baseStyles.push(styles.disabled);
     

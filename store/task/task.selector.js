@@ -1,6 +1,29 @@
 import { createSelector } from 'reselect'
 
 const selectTaskReducer = state => state.task
+const selectUserData = state => state.profile.userData
+
+// Consolidated selector to reduce re-renders
+export const selectTaskState = createSelector(
+  [selectTaskReducer],
+  (task) => ({
+    tasks: task.tasks,
+    taskTitle: task.taskTitle,
+    taskDescription: task.taskDescription,
+    selectedCategory: task.selectedCategory,
+    selectedPriority: task.selectedPriority,
+    dueDate: task.dueDate,
+    dueTime: task.dueTime,
+    taskTags: task.taskTags,
+    newTag: task.newTag,
+    showOtherTasks: task.showOtherTasks,
+    showProductivityFeatures: task.showProductivityFeatures,
+    isLoading: task.isLoading,
+    error: task.error,
+    selectedTask: (task.tasks || []).find(t => t.isSelected) || null, // Find selected task
+    otherTasks: (task.tasks || []).filter(t => !t.isSelected) // Filter out selected task
+  })
+)
 
 export const selectTasks = createSelector(
   [selectTaskReducer],
@@ -12,45 +35,7 @@ export const selectIsCreateTaskOpen = createSelector(
   (task) => task.isCreateTaskOpen
 )
 
-export const selectTaskTitle = createSelector(
-  [selectTaskReducer],
-  (task) => task.taskTitle
-)
-
-export const selectTaskDescription = createSelector(
-  [selectTaskReducer],
-  (task) => task.taskDescription
-)
-
-export const selectSelectedCategory = createSelector(
-  [selectTaskReducer],
-  (task) => task.selectedCategory
-)
-
-export const selectSelectedPriority = createSelector(
-  [selectTaskReducer],
-  (task) => task.selectedPriority
-)
-
-export const selectDueDate = createSelector(
-  [selectTaskReducer],
-  (task) => task.dueDate
-)
-
-export const selectDueTime = createSelector(
-  [selectTaskReducer],
-  (task) => task.dueTime
-)
-
-export const selectTaskTags = createSelector(
-  [selectTaskReducer],
-  (task) => task.taskTags
-)
-
-export const selectNewTag = createSelector(
-  [selectTaskReducer],
-  (task) => task.newTag
-)
+// Individual selectors removed - use selectTaskState for better performance
 
 export const selectShowOtherTasks = createSelector(
   [selectTaskReducer],

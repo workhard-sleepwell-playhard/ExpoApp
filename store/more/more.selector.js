@@ -12,25 +12,7 @@ export const selectQuickActions = createSelector(
   (more) => more.quickActions
 )
 
-export const selectSearchQuery = createSelector(
-  [selectMoreReducer],
-  (more) => more.searchQuery
-)
-
-export const selectFilteredSections = createSelector(
-  [selectMoreReducer],
-  (more) => more.filteredSections
-)
-
-export const selectShowSearch = createSelector(
-  [selectMoreReducer],
-  (more) => more.showSearch
-)
-
-export const selectShowNotifications = createSelector(
-  [selectMoreReducer],
-  (more) => more.showNotifications
-)
+// Unused selectors removed for optimization
 
 export const selectIsLoading = createSelector(
   [selectMoreReducer],
@@ -42,25 +24,7 @@ export const selectError = createSelector(
   (more) => more.error
 )
 
-// Derived selectors
-export const selectDisplaySections = createSelector(
-  [selectMoreSections, selectFilteredSections, selectSearchQuery],
-  (moreSections, filteredSections, searchQuery) => {
-    return searchQuery ? filteredSections : moreSections
-  }
-)
-
-export const selectHasSearchResults = createSelector(
-  [selectSearchQuery, selectFilteredSections],
-  (searchQuery, filteredSections) => {
-    return searchQuery && filteredSections.length > 0
-  }
-)
-
-export const selectIsSearchActive = createSelector(
-  [selectSearchQuery],
-  (searchQuery) => searchQuery.length > 0
-)
+// Derived selectors removed - not used in current UI
 
 export const selectTotalSections = createSelector(
   [selectMoreSections],
@@ -92,11 +56,4 @@ export const selectAppInfoSection = createSelector(
   (sections) => sections.find(section => section.title === 'App Info')
 )
 
-export const selectMoreStats = createSelector(
-  [selectTotalSections, selectTotalItems, selectQuickActions],
-  (totalSections, totalItems, quickActions) => ({
-    totalSections,
-    totalItems,
-    quickActionsCount: quickActions.length
-  })
-)
+// selectMoreStats removed - not used in current UI

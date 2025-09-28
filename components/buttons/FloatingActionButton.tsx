@@ -24,7 +24,7 @@ export const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
   const colorScheme = useColorScheme();
 
   const getButtonStyles = () => {
-    const baseStyles = [
+    const baseStyles: any[] = [
       styles.fab,
       styles[size],
       styles[position],

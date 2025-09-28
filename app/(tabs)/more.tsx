@@ -1,30 +1,21 @@
 import React from 'react';
-import { StyleSheet, ScrollView, Alert, Linking } from 'react-native';
+import { StyleSheet, ScrollView, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
+import { useCentralizedListener } from '../../hooks/use-centralized-listener';
 
 // Import Redux selectors and actions
 import { 
   selectMoreSections, 
-  selectQuickActions, 
-  selectSearchQuery, 
-  selectFilteredSections, 
-  selectShowSearch, 
-  selectShowNotifications,
-  selectDisplaySections,
-  selectHasSearchResults,
-  selectIsSearchActive,
-  selectMoreStats
+  selectQuickActions
 } from '../../store/more/more.selector';
 import { 
   handleSearchPress, 
   handleNotificationPress, 
   handleQuickActionPress, 
   handleItemPress,
-  handleSearchQuery,
-  loadMoreData,
-  clearSearch
+  loadMoreData
 } from '../../store/more/more.action';
 
 // Import new components
@@ -35,17 +26,12 @@ import { MoreSection } from '../../components/tabscomponents/more/moreSection.co
 export default function MoreScreen() {
   const dispatch = useDispatch();
   
+  // Initialize centralized listeners
+  useCentralizedListener();
+  
   // Redux state
   const moreSections = useSelector(selectMoreSections);
   const quickActions = useSelector(selectQuickActions);
-  const searchQuery = useSelector(selectSearchQuery);
-  const filteredSections = useSelector(selectFilteredSections);
-  const showSearch = useSelector(selectShowSearch);
-  const showNotifications = useSelector(selectShowNotifications);
-  const displaySections = useSelector(selectDisplaySections);
-  const hasSearchResults = useSelector(selectHasSearchResults);
-  const isSearchActive = useSelector(selectIsSearchActive);
-  const moreStats = useSelector(selectMoreStats);
   
   // Load initial data when component mounts
   React.useEffect(() => {
@@ -83,7 +69,7 @@ export default function MoreScreen() {
         onActionPress={onQuickActionPress}
       />
 
-      {displaySections.map((section: any) => (
+      {moreSections.map((section: any) => (
         <MoreSection
           key={section.title}
           title={section.title}

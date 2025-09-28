@@ -10,7 +10,7 @@ export const CreatePostButton: React.FC<CreatePostButtonProps> = ({ onPress }) =
   return (
     <TouchableOpacity style={styles.createPostButton} onPress={onPress}>
       <ThemedText style={styles.createPostIcon}>✏️</ThemedText>
-      <ThemedText style={styles.createPostText}>What's on your mind?</ThemedText>
+      <ThemedText style={styles.createPostText}>What&apos;s on your mind?</ThemedText>
     </TouchableOpacity>
   );
 };

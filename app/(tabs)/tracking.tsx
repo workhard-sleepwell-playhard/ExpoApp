@@ -1,11 +1,12 @@
 import React from 'react';
-import { StyleSheet, ScrollView, View, TouchableOpacity, Animated, Dimensions } from 'react-native';
+import { StyleSheet, ScrollView, View, TouchableOpacity, Dimensions } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
+import { useCentralizedListener } from '../../hooks/use-centralized-listener';
 
 // Import Redux selectors and actions
 import { 
@@ -32,10 +33,9 @@ import {
   handleNextSlide, 
   handlePrevSlide, 
   handleNavigateTimePeriod, 
-  handleCustomDateClick, 
+  handleCustomDateClick,
   handleCloseCustomDatePicker, 
-  handleApplyCustomDateRange,
-  setTimePeriodDirectly
+  handleApplyCustomDateRange
 } from '../../store/tracking/tracking.action';
 
 // Import new components
@@ -45,11 +45,12 @@ import { TimePeriodSelector } from '../../components/tabscomponents/tracking/tra
 
 const { height: screenHeight } = Dimensions.get('window');
 
-const screenWidth = Dimensions.get('window').width;
-
 export default function TrackingScreen() {
   const dispatch = useDispatch();
   const colorScheme = useColorScheme();
+  
+  // Initialize centralized listeners
+  useCentralizedListener();
   
   // Redux state
   const trackingData = useSelector(selectTrackingData);
@@ -59,8 +60,7 @@ export default function TrackingScreen() {
   const currentSlide = useSelector(selectCurrentSlide);
   const timePeriod = useSelector(selectTimePeriod);
   const showCustomDatePicker = useSelector(selectShowCustomDatePicker);
-  const customDateFrom = useSelector(selectCustomDateFrom);
-  const customDateTo = useSelector(selectCustomDateTo);
+  // customDateFrom and customDateTo removed - not used in UI
   const slides = useSelector(selectSlides);
   const currentSlideData = useSelector(selectCurrentSlideData);
   const maxHours = useSelector(selectMaxHours);
@@ -75,7 +75,7 @@ export default function TrackingScreen() {
     dispatch(handleNavigateTimePeriod(direction));
   };
 
-  const handleCustomDateClick = () => {
+  const onCustomDateClick = () => {
     dispatch(handleCustomDateClick());
   };
 
@@ -226,7 +226,7 @@ export default function TrackingScreen() {
         <TimePeriodSelector
           timePeriod={timePeriod}
           onNavigate={navigateTimePeriod}
-          onCustomDateClick={handleCustomDateClick}
+          onCustomDateClick={onCustomDateClick}
           getTimePeriodLabel={() => timePeriodLabel}
           getTimePeriodIcon={() => timePeriodIcon}
         />

@@ -11,32 +11,15 @@ import { useAuth } from '@/components/auth/AuthProvider';
 
 // Import Redux selectors and actions
 import { 
-  selectUserData, 
-  selectUserStats, 
-  selectAchievements, 
-  selectNotificationsEnabled, 
+  selectUserData, // Single source of truth
   selectShowSettings, 
   selectShowEditProfile,
-  selectUserName,
-  selectUserEmail,
-  selectUserAvatar,
-  selectUserJoinDate,
-  selectTotalTasks,
-  selectCompletedTasks,
-  selectCurrentStreak,
-  selectTotalPoints,
   selectProfileOptions,
-  selectProfileStats,
-  selectRecentAchievements,
   selectIsLoading,
   selectError
 } from '../../store/profile/profile.selector';
 import { 
   handleOptionPress, 
-  saveProfileChanges, 
-  updateUserAvatar, 
-  updateUserName, 
-  updateUserEmail, 
   handleCollectionPress, 
   handleEditAvatar, 
   openSettings,
@@ -44,13 +27,10 @@ import {
   openEditProfile,
   closeEditProfile,
   toggleNotifications,
-  fetchUserProfile,
-  updateUserNameWithSync,
-  updateUserAvatarWithSync,
   toggleNotificationsWithSync
 } from '../../store/profile/profile.action';
-import { fetchPosts } from '../../store/home/home.action';
-import { signOutStart } from '../../store/auth/auth.action';
+        import { signOutStart } from '../../store/auth/auth.action';
+        import { useCentralizedListener } from '../../hooks/use-centralized-listener';
 
 // Import new components
 import { ProfileHeader } from '../../components/tabscomponents/profile/profileHeader.component';
@@ -60,7 +40,7 @@ import { ConfirmationModal } from '../../components/modals/ConfirmationModal';
 
 const { height: screenHeight } = Dimensions.get('window');
 
-export default function ProfileScreen() {
+const ProfileScreen = React.memo(function ProfileScreen() {
   const dispatch = useDispatch();
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -71,29 +51,35 @@ export default function ProfileScreen() {
   // Confirmation modal state
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
   
-  // Redux state
-  const userData = useSelector(selectUserData);
-  const userStats = useSelector(selectUserStats);
-  const achievements = useSelector(selectAchievements);
-  const notificationsEnabled = useSelector(selectNotificationsEnabled);
+  // Redux state - Optimized to reduce re-renders
+  const userData = useSelector(selectUserData); // Single source of truth
   const showSettings = useSelector(selectShowSettings);
   const showEditProfile = useSelector(selectShowEditProfile);
-  const userName = useSelector(selectUserName);
-  const userEmail = useSelector(selectUserEmail);
-  const userAvatar = useSelector(selectUserAvatar);
-  const userJoinDate = useSelector(selectUserJoinDate);
-  const totalTasks = useSelector(selectTotalTasks);
-  const completedTasks = useSelector(selectCompletedTasks);
-  const currentStreak = useSelector(selectCurrentStreak);
-  const totalPoints = useSelector(selectTotalPoints);
   const profileOptions = useSelector(selectProfileOptions);
-  const profileStats = useSelector(selectProfileStats);
-  const recentAchievements = useSelector(selectRecentAchievements);
   const isLoading = useSelector(selectIsLoading);
   const error = useSelector(selectError);
   
-  // Profile data is now fetched automatically via auth flow
-  // No need to manually load profile data here
+  // Extract values from userData to avoid multiple selectors
+  const {
+    notificationsEnabled,
+    name: userName,
+    email: userEmail,
+    avatar: userAvatar,
+    joinDate: userJoinDate,
+    totalTasks,
+    completedTasks,
+    currentStreak,
+    totalPoints,
+    achievements: recentAchievements
+  } = userData || {};
+  
+  // Initialize only profile-related listeners
+  useCentralizedListener({
+    enablePosts: false,        // Profile tab doesn't need posts
+    enableUserData: true,      // Need userData for profile display
+    enableTasks: false,        // Profile tab doesn't need tasks
+    enableLeaderboards: false  // Profile tab doesn't need leaderboards
+  });
   
   // Animation values
   const slideAnimation = React.useRef(new Animated.Value(screenHeight)).current;
@@ -189,9 +175,7 @@ export default function ProfileScreen() {
         <TouchableOpacity 
           style={styles.retryButton}
           onPress={() => {
-            if (currentUser?.uid) {
-              dispatch(fetchUserProfile(currentUser.uid) as any);
-            }
+            // User data is already loaded via real-time listener
           }}
         >
           <ThemedText style={styles.retryButtonText}>Retry</ThemedText>
@@ -237,7 +221,7 @@ export default function ProfileScreen() {
       <ThemedView style={styles.achievementsCard}>
         <ThemedText type="subtitle" style={styles.cardTitle}>Recent Achievements</ThemedText>
         <View style={styles.achievementsList}>
-          {recentAchievements.map((achievement: any) => (
+          {(recentAchievements || []).map((achievement: any) => (
             <View key={achievement.id} style={styles.achievementItem}>
               <View style={[styles.achievementIcon, { backgroundColor: achievement.color }]}>
                 <IconSymbol name={achievement.icon as any} size={20} color="white" />
@@ -286,7 +270,7 @@ export default function ProfileScreen() {
               </View>
 
               <ScrollView style={styles.settingsContent}>
-                {profileOptions.map((option) => (
+                {(profileOptions || []).map((option) => (
                   <TouchableOpacity 
                     key={option.id} 
                     style={styles.optionItem}
@@ -425,7 +409,9 @@ export default function ProfileScreen() {
       />
     </ScrollView>
   );
-}
+});
+
+export default ProfileScreen;
 
 const styles = StyleSheet.create({
   container: {

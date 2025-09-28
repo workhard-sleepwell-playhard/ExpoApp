@@ -3,7 +3,7 @@ import { View, TouchableOpacity, Animated, PanResponder, StyleSheet } from 'reac
 import { ThemedText } from '@/components/themed-text';
 
 interface Task {
-  id: number;
+  id: string | number;
   title: string;
   description: string;
   completed: boolean;
@@ -20,9 +20,10 @@ interface Task {
 interface TaskCardProps {
   task: Task;
   isMainTask?: boolean;
-  onToggle: (taskId: number) => void;
-  onSelect: (taskId: number) => void;
-  onDelete: (taskId: number) => void;
+  onToggle: (taskId: string | number) => void;
+  onSelect: (taskId: string | number) => void;
+  onDelete: (taskId: string | number) => void;
+  onEdit: (taskId: string | number) => void;
   onProductivity: () => void;
   getPriorityColor: (priority: string) => string;
 }
@@ -33,12 +34,22 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onToggle,
   onSelect,
   onDelete,
+  onEdit,
   onProductivity,
   getPriorityColor,
 }) => {
   const translateX = React.useRef(new Animated.Value(0)).current;
   const leftActionOpacity = React.useRef(new Animated.Value(0)).current;
   const rightActionOpacity = React.useRef(new Animated.Value(0)).current;
+  
+  // Cleanup animations on unmount
+  React.useEffect(() => {
+    return () => {
+      translateX.stopAnimation();
+      leftActionOpacity.stopAnimation();
+      rightActionOpacity.stopAnimation();
+    };
+  }, [translateX, leftActionOpacity, rightActionOpacity]);
 
   const panResponder = PanResponder.create({
     onMoveShouldSetPanResponder: (_, gestureState) => {
@@ -47,21 +58,24 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     onPanResponderMove: (_, gestureState) => {
       const { dx } = gestureState;
       
+      // Only handle horizontal swipes
       if (dx > 0) {
-        // Swiping right - show delete action
+        // Swiping right - show select action
         translateX.setValue(Math.min(dx * 0.5, 100));
         leftActionOpacity.setValue(Math.min(dx / 100, 1));
+        rightActionOpacity.setValue(0);
       } else if (dx < 0) {
         // Swiping left - show productivity action
         translateX.setValue(Math.max(dx * 0.5, -100));
         rightActionOpacity.setValue(Math.min(Math.abs(dx) / 100, 1));
+        leftActionOpacity.setValue(0);
       }
     },
     onPanResponderRelease: (_, gestureState) => {
       const { dx, vx } = gestureState;
       
       if (dx > 80 || vx > 0.5) {
-        // Swiped right - delete task
+        // Swiped right - select task as main focus
         Animated.parallel([
           Animated.timing(translateX, {
             toValue: 300,
@@ -74,7 +88,19 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             useNativeDriver: true,
           })
         ]).start(() => {
-          onDelete(task.id);
+          onSelect(task.id);
+          // Reset position
+          Animated.parallel([
+            Animated.spring(translateX, {
+              toValue: 0,
+              useNativeDriver: true,
+            }),
+            Animated.timing(leftActionOpacity, {
+              toValue: 0,
+              duration: 200,
+              useNativeDriver: true,
+            })
+          ]).start();
         });
       } else if (dx < -80 || vx < -0.5) {
         // Swiped left - open productivity features
@@ -133,16 +159,18 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
   return (
     <View style={[isMainTask ? styles.mainTaskItem : styles.taskItem, { overflow: 'hidden' }]}>
-      {/* Left Action - Delete */}
+      {/* Left Action - Select */}
       <Animated.View 
         style={[
           styles.swipeAction,
-          styles.deleteAction,
+          styles.selectAction,
           { opacity: leftActionOpacity }
         ]}
+        accessibilityLabel="Select task as main focus"
+        accessibilityRole="button"
       >
-        <ThemedText style={styles.actionIcon}>🗑️</ThemedText>
-        <ThemedText style={styles.actionText}>Delete</ThemedText>
+        <ThemedText style={styles.actionIcon}>⭐</ThemedText>
+        <ThemedText style={styles.actionText}>Select</ThemedText>
       </Animated.View>
 
       {/* Right Action - Productivity */}
@@ -152,6 +180,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           styles.productivityAction,
           { opacity: rightActionOpacity }
         ]}
+        accessibilityLabel="Open productivity features"
+        accessibilityRole="button"
       >
         <ThemedText style={styles.actionIcon}>⚡</ThemedText>
         <ThemedText style={styles.actionText}>Productivity</ThemedText>
@@ -167,7 +197,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       >
         <TouchableOpacity 
           style={styles.taskContentInner}
-          onPress={() => isMainTask ? onToggle(task.id) : onSelect(task.id)}
+          onPress={() => onToggle(task.id)}
+          accessibilityLabel={`${task.title} task`}
+          accessibilityHint={task.completed ? "Mark as incomplete" : "Mark as complete"}
+          accessibilityRole="button"
+          accessibilityState={{ checked: task.completed }}
         >
           <View style={styles.taskLeft}>
             <ThemedText style={styles.taskIcon}>
@@ -185,7 +219,17 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               <ThemedText style={styles.taskDueDate}>Due: {task.dueDate}</ThemedText>
             </View>
           </View>
-          <View style={[styles.priorityDot, { backgroundColor: getPriorityColor(task.priority) }]} />
+          <View style={styles.taskRight}>
+            <TouchableOpacity 
+              style={styles.editButton}
+              onPress={() => onEdit(task.id)}
+              accessibilityLabel="Edit task"
+              accessibilityRole="button"
+            >
+              <ThemedText style={styles.editButtonText}>✏️</ThemedText>
+            </TouchableOpacity>
+            <View style={[styles.priorityDot, { backgroundColor: getPriorityColor(task.priority) }]} />
+          </View>
         </TouchableOpacity>
       </Animated.View>
     </View>
@@ -214,9 +258,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 1,
   },
-  deleteAction: {
+  selectAction: {
     left: 0,
-    backgroundColor: '#FF3B30',
+    backgroundColor: '#FF9500',
   },
   productivityAction: {
     right: 0,
@@ -249,6 +293,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+  },
+  taskRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  editButton: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#F5F5F5',
+  },
+  editButtonText: {
+    fontSize: 16,
   },
   taskIcon: {
     fontSize: 20,

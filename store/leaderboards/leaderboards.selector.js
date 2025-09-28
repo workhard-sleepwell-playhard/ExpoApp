@@ -1,6 +1,21 @@
 import { createSelector } from 'reselect'
 
 const selectLeaderboardsReducer = state => state.leaderboards
+const selectProfileReducer = state => state.profile
+
+// Consolidated selector for leaderboards state
+export const selectLeaderboardsState = createSelector(
+  [selectLeaderboardsReducer, selectProfileReducer],
+  (leaderboards, profile) => ({
+    rankings: leaderboards.rankings,
+    selectedTab: leaderboards.selectedTab,
+    isLoading: leaderboards.isLoading,
+    error: leaderboards.error,
+    userGlobalRank: profile.userData.globalRank || 0,
+    userTotalPoints: profile.userData.totalPoints || 0,
+    userTimeRemaining: profile.userData.timeRemainingToClimb || 0
+  })
+)
 
 export const selectUserStats = createSelector(
   [selectLeaderboardsReducer],
@@ -47,51 +62,7 @@ export const selectLastUpdated = createSelector(
   (leaderboards) => leaderboards.lastUpdated
 )
 
-// Derived selectors
-export const selectCurrentRankings = createSelector(
-  [selectRankings, selectSelectedTab],
-  (rankings, selectedTab) => rankings[selectedTab] || []
-)
-
-export const selectUserGlobalRank = createSelector(
-  [selectUserStats],
-  (userStats) => userStats.globalRank
-)
-
-export const selectUserTotalPoints = createSelector(
-  [selectUserStats],
-  (userStats) => userStats.totalPoints
-)
-
-export const selectUserTimeRemaining = createSelector(
-  [selectUserStats],
-  (userStats) => userStats.timeRemainingToClimb
-)
-
-export const selectUserWeeklyRank = createSelector(
-  [selectUserStats],
-  (userStats) => userStats.weeklyRank
-)
-
-export const selectUserStreakRank = createSelector(
-  [selectUserStats],
-  (userStats) => userStats.streakRank
-)
-
-export const selectUserCurrentStreak = createSelector(
-  [selectUserStats],
-  (userStats) => userStats.currentStreak
-)
-
-export const selectUserBestStreak = createSelector(
-  [selectUserStats],
-  (userStats) => userStats.bestStreak
-)
-
-export const selectUserWeeklyPoints = createSelector(
-  [selectUserStats],
-  (userStats) => userStats.weeklyPoints
-)
+// Individual selectors removed - use selectLeaderboardsState for better performance
 
 export const selectTabOptions = createSelector(
   [],
@@ -107,30 +78,4 @@ export const selectCurrentTabOption = createSelector(
   (selectedTab, options) => options.find(option => option.id === selectedTab) || options[0]
 )
 
-export const selectLeaderboardStats = createSelector(
-  [selectUserStats, selectCurrentRankings],
-  (userStats, currentRankings) => ({
-    userRank: userStats.globalRank,
-    totalPoints: userStats.totalPoints,
-    timeToClimb: userStats.timeRemainingToClimb,
-    totalUsers: currentRankings.length,
-    topUser: currentRankings[0] || null,
-    userPosition: currentRankings.findIndex(user => user.isCurrentUser) + 1
-  })
-)
-
-export const selectRankingSummary = createSelector(
-  [selectCurrentRankings, selectUserStats, selectSelectedTab],
-  (rankings, userStats, selectedTab) => {
-    const totalUsers = rankings.length
-    const userRank = userStats[`${selectedTab}Rank`] || userStats.globalRank
-    
-    return {
-      totalUsers,
-      userRank,
-      rankPercentage: totalUsers > 0 ? Math.round(((totalUsers - userRank + 1) / totalUsers) * 100) : 0,
-      usersAbove: userRank - 1,
-      usersBelow: totalUsers - userRank
-    }
-  }
-)
+// Complex selectors removed - calculate in components using selectLeaderboardsState

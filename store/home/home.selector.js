@@ -2,6 +2,20 @@ import { createSelector } from 'reselect'
 
 const selectHomeReducer = state => state.home
 
+// Consolidated selector to reduce re-renders
+export const selectHomeState = createSelector(
+  [selectHomeReducer],
+  (home) => ({
+    posts: home.posts,
+    postContent: home.postContent,
+    selectedImages: home.selectedImages,
+    selectedVideos: home.selectedVideos,
+    postType: home.postType,
+    isPublic: home.isPublic
+  })
+)
+
+// Individual selectors - kept for backward compatibility
 export const selectPosts = createSelector(
   [selectHomeReducer],
   (home) => home.posts
@@ -10,31 +24,6 @@ export const selectPosts = createSelector(
 export const selectIsCreatePostOpen = createSelector(
   [selectHomeReducer],
   (home) => home.isCreatePostOpen
-)
-
-export const selectPostContent = createSelector(
-  [selectHomeReducer],
-  (home) => home.postContent
-)
-
-export const selectSelectedImages = createSelector(
-  [selectHomeReducer],
-  (home) => home.selectedImages
-)
-
-export const selectSelectedVideos = createSelector(
-  [selectHomeReducer],
-  (home) => home.selectedVideos
-)
-
-export const selectPostType = createSelector(
-  [selectHomeReducer],
-  (home) => home.postType
-)
-
-export const selectIsPublic = createSelector(
-  [selectHomeReducer],
-  (home) => home.isPublic
 )
 
 export const selectIsLoading = createSelector(

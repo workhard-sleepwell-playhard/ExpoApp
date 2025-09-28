@@ -77,7 +77,7 @@ export const Switch: React.FC<SwitchProps> = ({
   const switchSizes = getSwitchSizes();
 
   const getTrackStyles = () => {
-    const baseStyles = [
+    const baseStyles: any[] = [
       styles.track,
       {
         width: switchSizes.width,
@@ -104,7 +104,7 @@ export const Switch: React.FC<SwitchProps> = ({
   };
 
   const getLabelStyles = () => {
-    const baseStyles = [styles.label];
+    const baseStyles: any[] = [styles.label];
     
     switch (size) {
       case 'small':

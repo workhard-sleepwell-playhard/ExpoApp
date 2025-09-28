@@ -93,13 +93,16 @@ export const RankingsList: React.FC<RankingsListProps> = ({
 
       {/* Leaderboard List */}
       <View style={styles.leaderboardList}>
-        {rankings.map((user) => (
-          <ThemedView key={user.id} style={[
-            styles.userCard,
-            user.rank <= 3 && styles.topThreeCard,
-            user.isCurrentUser && styles.currentUserCard,
-            { backgroundColor: getRankBackgroundColor(user.rank) }
-          ]}>
+        {rankings.map((user, index) => (
+          <ThemedView
+            key={user.id || index}
+            style={[
+              styles.userCard,
+              user.rank <= 3 && styles.topThreeCard,
+              user.isCurrentUser && styles.currentUserCard,
+              { backgroundColor: getRankBackgroundColor(user.rank) }
+            ]}
+          >
             {/* Rank Section */}
             <View style={styles.rankSection}>
               {user.rank === 1 ? (
@@ -146,17 +149,17 @@ export const RankingsList: React.FC<RankingsListProps> = ({
               <View style={styles.userStats}>
                 {selectedTab === 'overall' && (
                   <ThemedText style={styles.statText}>
-                    🏆 {user.totalPoints.toLocaleString()} points
+                    🏆 {(user.totalPoints || 0).toLocaleString()} points
                   </ThemedText>
                 )}
                 {selectedTab === 'weekly' && (
                   <ThemedText style={styles.statText}>
-                    📈 {user.weeklyPoints} this week
+                    📈 {user.weeklyPoints || 0} this week
                   </ThemedText>
                 )}
                 {selectedTab === 'streaks' && (
                   <ThemedText style={styles.statText}>
-                    🔥 {user.currentStreak} day streak
+                    🔥 {user.currentStreak || 0} day streak
                   </ThemedText>
                 )}
               </View>

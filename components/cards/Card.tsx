@@ -28,7 +28,7 @@ export const Card: React.FC<CardProps> = ({
   const isDark = colorScheme === 'dark';
 
   const getCardStyles = () => {
-    const baseStyles = [styles.card];
+    const baseStyles: any[] = [styles.card];
     
     // Variant styles
     switch (variant) {
@@ -62,16 +62,16 @@ export const Card: React.FC<CardProps> = ({
     }
     
     // Padding styles
-    baseStyles.push(styles[`padding${padding.charAt(0).toUpperCase() + padding.slice(1)}`]);
+    baseStyles.push((styles as any)[`padding${padding.charAt(0).toUpperCase() + padding.slice(1)}`]);
     
     // Margin styles
     if (margin !== 'none') {
-      baseStyles.push(styles[`margin${margin.charAt(0).toUpperCase() + margin.slice(1)}`]);
+      baseStyles.push((styles as any)[`margin${margin.charAt(0).toUpperCase() + margin.slice(1)}`]);
     }
     
     // Border radius styles
     if (borderRadius !== 'none') {
-      baseStyles.push(styles[`radius${borderRadius.charAt(0).toUpperCase() + borderRadius.slice(1)}`]);
+      baseStyles.push((styles as any)[`radius${borderRadius.charAt(0).toUpperCase() + borderRadius.slice(1)}`]);
     }
     
     // Disabled state

@@ -10,6 +10,7 @@ import {
   selectPosts
 } from '../store/home/home.selector';
 import { deletePostAsync } from '../store/home/home.action';
+import { SimpleRealtimeService } from '../src/services/simple-realtime';
 
 // Import auth context to get current user
 import { useAuth } from '../components/auth/AuthProvider';
@@ -40,19 +41,32 @@ export default function MyPostsScreen() {
   // No need to fetch data - we filter from existing state
   // The home page already fetches all posts, so we just filter them here
 
-  const handleLike = (postId: string | number) => {
-    // TODO: Implement like functionality
-    console.log('Like post:', postId);
+  const handleLike = async (postId: string | number) => {
+    try {
+      if (currentUser?.uid) {
+        await SimpleRealtimeService.likePost(postId.toString(), currentUser.uid);
+      }
+    } catch (error) {
+      console.error('Error liking post:', error);
+    }
   };
 
   const handleComment = (postId: string | number) => {
-    // TODO: Implement comment functionality
-    console.log('Comment on post:', postId);
+    // Navigate to home tab to view comments
+    router.push('/');
   };
 
-  const handleShare = (postId: string | number) => {
-    // TODO: Implement share functionality
-    console.log('Share post:', postId);
+  const handleShare = async (postId: string | number) => {
+    try {
+      // Implement share functionality using React Native Share API
+      const { Share } = await import('react-native');
+      await Share.share({
+        message: `Check out this post: ${postId}`,
+        title: 'Share Post'
+      });
+    } catch (error) {
+      console.error('Error sharing post:', error);
+    }
   };
 
   const handleDelete = async (postId: string | number) => {
@@ -93,7 +107,7 @@ export default function MyPostsScreen() {
             <ThemedText style={styles.emptyIcon}>📝</ThemedText>
             <ThemedText style={styles.emptyTitle}>No Posts Yet</ThemedText>
             <ThemedText style={styles.emptyDescription}>
-              You haven't created any posts yet.
+              You haven&apos;t created any posts yet.
             </ThemedText>
           </View>
         ) : (

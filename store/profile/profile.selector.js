@@ -7,19 +7,10 @@ export const selectUserData = createSelector(
   (profile) => profile.userData
 )
 
-export const selectUserStats = createSelector(
-  [selectProfileReducer],
-  (profile) => profile.userData.stats
-)
-
+// Essential selectors only - individual selectors removed for performance
 export const selectAchievements = createSelector(
   [selectProfileReducer],
   (profile) => profile.achievements
-)
-
-export const selectNotificationsEnabled = createSelector(
-  [selectUserData],
-  (userData) => userData.notificationsEnabled
 )
 
 export const selectShowSettings = createSelector(
@@ -42,47 +33,6 @@ export const selectError = createSelector(
   (profile) => profile.error
 )
 
-// Derived selectors
-export const selectUserName = createSelector(
-  [selectUserData],
-  (userData) => userData.name
-)
-
-export const selectUserEmail = createSelector(
-  [selectUserData],
-  (userData) => userData.email
-)
-
-export const selectUserAvatar = createSelector(
-  [selectUserData],
-  (userData) => userData.avatar
-)
-
-export const selectUserJoinDate = createSelector(
-  [selectUserData],
-  (userData) => userData.joinDate
-)
-
-export const selectTotalTasks = createSelector(
-  [selectUserStats],
-  (stats) => stats.totalTasks
-)
-
-export const selectCompletedTasks = createSelector(
-  [selectUserStats],
-  (stats) => stats.completedTasks
-)
-
-export const selectCurrentStreak = createSelector(
-  [selectUserStats],
-  (stats) => stats.currentStreak
-)
-
-export const selectTotalPoints = createSelector(
-  [selectUserStats],
-  (stats) => stats.totalPoints
-)
-
 export const selectProfileOptions = createSelector(
   [],
   () => [
@@ -96,13 +46,13 @@ export const selectProfileOptions = createSelector(
 )
 
 export const selectProfileStats = createSelector(
-  [selectUserStats],
-  (stats) => ({
-    totalTasks: stats.totalTasks,
-    completedTasks: stats.completedTasks,
-    currentStreak: stats.currentStreak,
-    totalPoints: stats.totalPoints,
-    completionRate: stats.totalTasks > 0 ? Math.round((stats.completedTasks / stats.totalTasks) * 100) : 0
+  [selectUserData],
+  (userData) => ({
+    totalTasks: userData.totalTasks || 0,
+    completedTasks: userData.completedTasks || 0,
+    currentStreak: userData.currentStreak || 0,
+    totalPoints: userData.totalPoints || 0,
+    completionRate: (userData.totalTasks || 0) > 0 ? Math.round(((userData.completedTasks || 0) / (userData.totalTasks || 0)) * 100) : 0
   })
 )
 

@@ -32,7 +32,7 @@ export const Button: React.FC<ButtonProps> = ({
   const isDark = colorScheme === 'dark';
 
   const getButtonStyles = () => {
-    const baseStyles = [styles.button, styles[size]];
+    const baseStyles: any[] = [styles.button, styles[size]];
     
     if (fullWidth) baseStyles.push(styles.fullWidth);
     if (disabled) baseStyles.push(styles.disabled);
@@ -83,7 +83,7 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const getTextStyles = () => {
-    const baseStyles = [styles.text, styles[`${size}Text`]];
+    const baseStyles: any[] = [styles.text, styles[`${size}Text`]];
     
     if (disabled) baseStyles.push(styles.disabledText);
     

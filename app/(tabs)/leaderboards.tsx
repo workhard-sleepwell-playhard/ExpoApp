@@ -3,27 +3,18 @@ import { StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+// useColorScheme removed - not used
 
 // Import Redux selectors and actions
 import { 
-  selectUserStats, 
-  selectCurrentRankings, 
-  selectSelectedTab,
-  selectUserGlobalRank,
-  selectUserTotalPoints,
-  selectUserTimeRemaining,
-  selectIsLoading,
-  selectError
+  selectLeaderboardsState // Consolidated selector
 } from '../../store/leaderboards/leaderboards.selector';
 import { 
   handleTabChange, 
-  fetchLeaderboardData,
-  calculateUserStatsFromProfile,
   refreshLeaderboardData
 } from '../../store/leaderboards/leaderboards.action';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { selectUserData } from '../../store/profile/profile.selector';
+import { useCentralizedListener } from '../../hooks/use-centralized-listener';
 
 // Import new components
 import { LeaderboardHeader } from '../../components/tabscomponents/leaderboards/leaderboardsHeader.component';
@@ -32,54 +23,40 @@ import { RankingsList } from '../../components/tabscomponents/leaderboards/leade
 
 export default function LeaderboardsScreen() {
   const dispatch = useDispatch();
-  const colorScheme = useColorScheme();
+  // colorScheme removed - not used
   
   // Auth context for current user
   const { currentUser, isAuthenticated } = useAuth();
   
-  // Redux state
-  const userStats = useSelector(selectUserStats);
-  const rankings = useSelector(selectCurrentRankings);
-  const selectedTab = useSelector(selectSelectedTab);
-  const globalRank = useSelector(selectUserGlobalRank);
-  const totalPoints = useSelector(selectUserTotalPoints);
-  const timeRemainingToClimb = useSelector(selectUserTimeRemaining);
-  const isLoading = useSelector(selectIsLoading);
-  const error = useSelector(selectError);
+  // Redux state - Consolidated selector
+  const leaderboardsState = useSelector(selectLeaderboardsState);
   
-  // Get user profile data from profile store (no duplicate Firebase calls!)
-  const userProfile = useSelector(selectUserData);
+  // Extract values from consolidated state
+  const {
+    rankings,
+    selectedTab,
+    isLoading,
+    error,
+    userGlobalRank: globalRank,
+    userTotalPoints: totalPoints,
+    userTimeRemaining: timeRemainingToClimb
+  } = leaderboardsState;
   
-  // Load initial data when component mounts and user is authenticated
-  React.useEffect(() => {
-    if (isAuthenticated && currentUser?.uid) {
-      // Fetch leaderboard data efficiently (no duplicate user data fetch!)
-      dispatch(fetchLeaderboardData(currentUser.uid) as any);
-    }
-  }, [dispatch, isAuthenticated, currentUser?.uid]);
+  // Get current rankings for selected tab
+  const currentRankings = rankings[selectedTab] || [];
+  
+  // Initialize only leaderboard-related listeners
+  useCentralizedListener({
+    enablePosts: false,        // Leaderboards tab doesn't need posts
+    enableUserData: true,      // Need userData for current user stats
+    enableTasks: false,        // Leaderboards tab doesn't need tasks
+    enableLeaderboards: true   // Need leaderboards for this tab
+  });
 
-  // Calculate user stats from existing profile data when rankings are available
-  React.useEffect(() => {
-    if (userProfile && rankings && currentUser?.uid) {
-      dispatch(calculateUserStatsFromProfile(userProfile, rankings, currentUser.uid) as any);
-    }
-  }, [dispatch, userProfile, rankings, currentUser?.uid]);
-
-  // Debug logging
-  React.useEffect(() => {
-    console.log('Leaderboards Debug Info:', {
-      isAuthenticated,
-      currentUserId: currentUser?.uid,
-      userProfile: !!userProfile,
-      rankingsLength: rankings.length,
-      selectedTab,
-      isLoading,
-      error
-    });
-  }, [isAuthenticated, currentUser?.uid, userProfile, rankings.length, selectedTab, isLoading, error]);
+  // Debug logging removed for production
 
   // Show loading state
-  if (isLoading && rankings.length === 0) {
+  if (isLoading && currentRankings.length === 0) {
     return (
       <ThemedView style={styles.loadingContainer}>
         <ThemedText>Loading leaderboards...</ThemedText>
@@ -88,7 +65,7 @@ export default function LeaderboardsScreen() {
   }
 
   // Show error state
-  if (error && rankings.length === 0) {
+  if (error && currentRankings.length === 0) {
     return (
       <ThemedView style={styles.errorContainer}>
         <ThemedText style={styles.errorText}>Error loading leaderboards: {error}</ThemedText>
@@ -126,7 +103,7 @@ export default function LeaderboardsScreen() {
       
       
       <RankingsList 
-        rankings={rankings}
+        rankings={currentRankings}
         selectedTab={selectedTab}
         onTabChange={(tab) => dispatch(handleTabChange(tab) as any)}
       />

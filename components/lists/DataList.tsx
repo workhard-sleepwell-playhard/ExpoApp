@@ -51,7 +51,7 @@ export const DataList: React.FC<DataListProps> = ({
   const isDark = colorScheme === 'dark';
 
   const getContainerStyles = () => {
-    const baseStyles = [styles.container];
+    const baseStyles: any[] = [styles.container];
     
     switch (variant) {
       case 'card':

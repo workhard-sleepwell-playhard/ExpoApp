@@ -1,12 +1,13 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, writeBatch, doc, getDocs, query, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, collection, writeBatch, doc, query, getDocs } from 'firebase/firestore';
+import { getDatabase } from 'firebase/database';
 import { getAuth, 
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged, } from 'firebase/auth';
-import { UserService } from '../../services/firebase-service';
+import { SimpleRealtimeService } from '../../services/simple-realtime';
 // Note: Storage and Functions might not be needed for basic auth
 // import { getStorage } from 'firebase/storage';
 // import { getFunctions } from 'firebase/functions';
@@ -28,6 +29,7 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firebase services
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+export const realtimeDb = getDatabase(app);
 // export const storage = getStorage(app); // Commented out to prevent potential web dependencies
 // export const functions = getFunctions(app); // Commented out to prevent potential web dependencies
 
@@ -68,7 +70,7 @@ export const getCategoriesAndDocuments = async () => {
   const q = query(collectionRef);
 
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((docSnapshot) => docSnapshot.data())
+  return querySnapshot.docs.map((docSnapshot: any) => docSnapshot.data())
 }
 
 export const createUserDocumentFromAuth = async (
@@ -85,12 +87,12 @@ export const createUserDocumentFromAuth = async (
     return;
   }
 
-  const userDocRef = doc(db, 'users', userAuth.uid);
-  const userSnapshot = await getDoc(userDocRef);
+  // Check if user exists in Realtime Database
+  const userProfile = await SimpleRealtimeService.getUserProfile(userAuth.uid);
 
-  console.log('User document exists:', userSnapshot.exists());
+  console.log('User document exists:', !!userProfile);
 
-  if (!userSnapshot.exists()) {
+  if (!userProfile) {
     const { displayName, email } = userAuth;
     console.log('Creating new user document for:', userAuth.uid);
 
@@ -101,7 +103,7 @@ export const createUserDocumentFromAuth = async (
                                  displayName || 
                                  (email ? email.split('@')[0] : 'User');
       
-      await UserService.createUser(userAuth.uid, {
+      await SimpleRealtimeService.createUser(userAuth.uid, {
         email: email || '',
         displayName: fallbackDisplayName,
         avatar: additionalInformation.avatar || '',
@@ -118,7 +120,7 @@ export const createUserDocumentFromAuth = async (
     console.log('User document already exists, skipping creation');
   }
 
-  return userDocRef;
+  return userAuth.uid;
 };
 
 export const createAuthUserWithEmailAndPassword = async (email: string, password: string) => {

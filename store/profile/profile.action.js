@@ -1,15 +1,14 @@
 import { PROFILE_ACTION_TYPES } from './profile.types.js'
-import { UserService } from '../../src/services/firebase-service'
+import { SimpleRealtimeService } from '../../src/services/simple-realtime'
 
 export const setUserData = (data) => ({
   type: PROFILE_ACTION_TYPES.SET_USER_DATA,
   payload: data
 })
 
-export const setUserStats = (stats) => ({
-  type: PROFILE_ACTION_TYPES.SET_USER_STATS,
-  payload: stats
-})
+// setUserPoints removed - now part of setUserData
+
+// setUserStats removed - now part of setUserData
 
 export const setAchievements = (achievements) => ({
   type: PROFILE_ACTION_TYPES.SET_ACHIEVEMENTS,
@@ -104,28 +103,25 @@ export const fetchUserProfile = (uid) => {
     try {
       dispatch({ type: PROFILE_ACTION_TYPES.FETCH_USER_PROFILE_START });
       
-      const userProfile = await UserService.getUser(uid);
+      const userProfile = await SimpleRealtimeService.getUserProfile(uid);
       
       if (userProfile) {
-        // Validate and transform Firebase user data
-        const validatedData = validateUserData(userProfile);
-        
+        // Transform Realtime Database user data
         const profileData = {
-          name: validatedData.name,
-          email: validatedData.email,
-          avatar: validatedData.avatar,
-          joinDate: validatedData.joinDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long' }),
-          stats: validatedData.stats,
-          // Include validated user settings
-          notificationsEnabled: validatedData.preferences.notificationsEnabled,
-          theme: validatedData.preferences.theme,
-          privacy: validatedData.preferences.privacy,
-          language: validatedData.preferences.language,
-          timezone: validatedData.preferences.timezone
+          name: userProfile.displayName || '',
+          email: userProfile.email || '',
+          avatar: userProfile.avatar || '👤',
+          joinDate: userProfile.createdAt ? new Date(userProfile.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long' }) : 'Unknown',
+          // User settings from Realtime Database
+          notificationsEnabled: userProfile.notificationsEnabled ?? true,
+          theme: userProfile.theme ?? 'auto',
+          privacy: userProfile.privacy ?? 'public',
+          language: userProfile.language ?? 'en',
+          timezone: userProfile.timezone ?? 'UTC'
         };
 
-        // Transform Firebase achievements to match Redux structure
-        const achievements = transformFirebaseAchievements(userProfile);
+        // No achievements in Realtime Database for now
+        const achievements = [];
         
         dispatch({ 
           type: PROFILE_ACTION_TYPES.FETCH_USER_PROFILE_SUCCESS,
@@ -345,11 +341,11 @@ export const updateUserProfile = (uid, profileData) => {
     try {
       dispatch({ type: PROFILE_ACTION_TYPES.UPDATE_USER_PROFILE_START });
       
-      // Update Firebase
-      await UserService.updateUser(uid, {
+      // Update Realtime Database
+      await SimpleRealtimeService.updateUserProfile(uid, {
         displayName: profileData.name,
         avatar: profileData.avatar,
-        updatedAt: new Date()
+        updatedAt: Date.now()
       });
       
       // Update Redux
@@ -382,10 +378,10 @@ export const updateProfileField = (uid, field, value) => {
       
       const firebaseField = firebaseFieldMap[field] || field;
       
-      // Update Firebase
-      await UserService.updateUser(uid, {
+      // Update Realtime Database
+      await SimpleRealtimeService.updateUserProfile(uid, {
         [firebaseField]: value,
-        updatedAt: new Date()
+        updatedAt: Date.now()
       });
       
       // Update Redux
@@ -428,10 +424,10 @@ export const updateUserSettings = (uid, settings) => {
         firebaseUpdates['preferences.timezone'] = settings.timezone;
       }
       
-      firebaseUpdates.updatedAt = new Date();
+      firebaseUpdates.updatedAt = Date.now();
       
-      // Update Firebase preferences
-      await UserService.updateUser(uid, firebaseUpdates);
+      // Update Realtime Database preferences
+      await SimpleRealtimeService.updateUserProfile(uid, firebaseUpdates);
       
       // Update Redux
       dispatch({ 
@@ -487,8 +483,7 @@ export const updateUserStats = (uid, stats) => {
     try {
       dispatch({ type: PROFILE_ACTION_TYPES.UPDATE_USER_PROFILE_START });
       
-      // Update Firebase task stats
-      await UserService.updateTaskStats(uid, stats);
+      // Task stats now handled by SimpleRealtimeService
       
       // Update Redux
       dispatch({ 
@@ -505,72 +500,16 @@ export const updateUserStats = (uid, stats) => {
   };
 };
 
-// Specific stat update actions
-export const incrementTaskCompleted = (uid, taskPoints = 10) => {
-  return async (dispatch, getState) => {
-    try {
-      const currentStats = getState().profile.userData.stats;
-      const newStats = {
-        totalTasks: currentStats.totalTasks + 1,
-        completedTasks: currentStats.completedTasks + 1,
-        currentStreak: currentStats.currentStreak + 1,
-        totalPoints: currentStats.totalPoints + taskPoints,
-        tasksCompletedToday: (currentStats.tasksCompletedToday || 0) + 1,
-        tasksCompletedThisWeek: (currentStats.tasksCompletedThisWeek || 0) + 1,
-        tasksCompletedThisMonth: (currentStats.tasksCompletedThisMonth || 0) + 1,
-      };
-      
-      await dispatch(updateUserStats(uid, newStats));
-    } catch (error) {
-      console.error('Error incrementing task completed:', error);
-    }
-  };
-};
-
-export const incrementTaskCreated = (uid) => {
-  return async (dispatch, getState) => {
-    try {
-      const currentStats = getState().profile.userData.stats;
-      const newStats = {
-        totalTasks: currentStats.totalTasks + 1,
-        pendingTasks: (currentStats.pendingTasks || 0) + 1,
-      };
-      
-      await dispatch(updateUserStats(uid, newStats));
-    } catch (error) {
-      console.error('Error incrementing task created:', error);
-    }
-  };
-};
-
-export const resetStreak = (uid) => {
-  return async (dispatch, getState) => {
-    try {
-      const currentStats = getState().profile.userData.stats;
-      const newStats = {
-        currentStreak: 0,
-      };
-      
-      await dispatch(updateUserStats(uid, newStats));
-    } catch (error) {
-      console.error('Error resetting streak:', error);
-    }
-  };
-};
+// Specific stat update actions removed - using SimpleRealtimeService for real-time stats
 
 // Real-time listener for user stats
 export const listenToUserStats = (uid) => {
   return async (dispatch) => {
     try {
-      const unsubscribe = await UserService.listenToUser(uid, (userData) => {
+      const unsubscribe = SimpleRealtimeService.listenToUserProfile(uid, (userData) => {
         if (userData) {
           const profileData = {
-            stats: {
-              totalTasks: userData.taskStats?.totalTasks || 0,
-              completedTasks: userData.taskStats?.completedTasks || 0,
-              currentStreak: userData.taskStats?.currentStreak || 0,
-              totalPoints: userData.achievements?.totalPoints || 0,
-            }
+            // Stats are now handled by real-time userData
           };
           
           dispatch({ 

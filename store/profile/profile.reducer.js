@@ -1,23 +1,54 @@
 import { PROFILE_ACTION_TYPES } from './profile.types.js'
 
 export const PROFILE_INITIAL_STATE = {
+  // Single user data object with all profile and points data
   userData: {
+    // Profile data
+    userId: '',
     name: '',
     email: '',
-    joinDate: '',
+    displayName: '',
+    username: '',
     avatar: '👤',
-    stats: {
-      totalTasks: 0,
-      completedTasks: 0,
-      currentStreak: 0,
-      totalPoints: 0,
-    },
-    // User settings from Firebase
+    bio: '',
+    joinDate: '',
+    
+    // Settings
     notificationsEnabled: true,
     theme: 'auto',
     privacy: 'public',
     language: 'en',
-    timezone: 'UTC'
+    timezone: 'UTC',
+    
+    // Points & stats
+    totalPoints: 0,
+    level: 1,
+    experience: 0,
+    experienceToNextLevel: 100,
+    
+    // Task stats
+    totalTasks: 0,
+    completedTasks: 0,
+    pendingTasks: 0,
+    overdueTasks: 0,
+    currentStreak: 0,
+    
+    // Social stats
+    postsCreated: 0,
+    postsLiked: 0,
+    postsShared: 0,
+    commentsMade: 0,
+    socialEngagement: 0,
+    
+    // Goals
+    dailyTaskGoal: 5,
+    dailyTimeGoal: 480,
+    
+    // Timestamps
+    createdAt: null,
+    updatedAt: null,
+    lastLoginAt: null,
+    lastActivityAt: null
   },
   achievements: [], // Will be populated from Firebase user data
   showSettings: false,
@@ -81,14 +112,7 @@ export const profileReducer = (state = PROFILE_INITIAL_STATE, action = {}) => {
         },
       }
     
-    case PROFILE_ACTION_TYPES.SET_USER_STATS:
-      return {
-        ...state,
-        userData: {
-          ...state.userData,
-          stats: { ...state.userData.stats, ...payload },
-        },
-      }
+    // SET_USER_STATS removed - now part of SET_USER_DATA
     
     case PROFILE_ACTION_TYPES.SET_ACHIEVEMENTS:
       return {

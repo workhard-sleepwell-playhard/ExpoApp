@@ -24,7 +24,7 @@ export const FormGroup: React.FC<FormGroupProps> = ({
   style,
 }) => {
   const getContainerStyles = () => {
-    const baseStyles = [styles.container];
+    const baseStyles: any[] = [styles.container];
     
     // Spacing
     switch (spacing) {

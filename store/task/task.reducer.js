@@ -11,7 +11,7 @@ export const TASK_INITIAL_STATE = {
   dueTime: '',
   taskTags: [],
   newTag: '',
-  showOtherTasks: false,
+  showOtherTasks: true,
   showProductivityFeatures: false,
   isLoading: false,
   error: null
@@ -94,9 +94,13 @@ export const taskReducer = (state = TASK_INITIAL_STATE, action = {}) => {
       }
     
     case TASK_ACTION_TYPES.ADD_TASK:
+      // Auto-select the new task if no task is currently selected
+      const hasSelectedTask = state.tasks.some(task => task.isSelected)
+      const newTask = hasSelectedTask ? payload : { ...payload, isSelected: true }
+      
       return {
         ...state,
-        tasks: [payload, ...state.tasks],
+        tasks: [newTask, ...state.tasks],
       }
     
     case TASK_ACTION_TYPES.UPDATE_TASK:
@@ -117,8 +121,13 @@ export const taskReducer = (state = TASK_INITIAL_STATE, action = {}) => {
       return {
         ...state,
         tasks: state.tasks.map(task => 
-          task.id === payload 
-            ? { ...task, completed: !task.completed }
+          task.id === payload
+            ? { 
+                ...task, 
+                completed: !task.completed,
+                // If completing task and points haven't been awarded, mark as awarded
+                pointsAwarded: !task.completed && !task.pointsAwarded ? true : task.pointsAwarded
+              }
             : task
         ),
       }
@@ -156,6 +165,49 @@ export const taskReducer = (state = TASK_INITIAL_STATE, action = {}) => {
         dueTime: '',
         taskTags: [],
         newTag: '',
+      }
+    
+    // Firebase operations
+    case TASK_ACTION_TYPES.CREATE_TASK_REQUEST:
+      return {
+        ...state,
+        isLoading: true,
+        error: null
+      }
+    
+    case TASK_ACTION_TYPES.CREATE_TASK_SUCCESS:
+      return {
+        ...state,
+        isLoading: false,
+        error: null
+      }
+    
+    case TASK_ACTION_TYPES.CREATE_TASK_ERROR:
+      return {
+        ...state,
+        isLoading: false,
+        error: payload
+      }
+    
+    case TASK_ACTION_TYPES.FETCH_TASKS_REQUEST:
+      return {
+        ...state,
+        isLoading: true,
+        error: null
+      }
+    
+    case TASK_ACTION_TYPES.FETCH_TASKS_SUCCESS:
+      return {
+        ...state,
+        isLoading: false,
+        error: null
+      }
+    
+    case TASK_ACTION_TYPES.FETCH_TASKS_ERROR:
+      return {
+        ...state,
+        isLoading: false,
+        error: payload
       }
     
     default:

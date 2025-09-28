@@ -22,6 +22,8 @@ export const homeReducer = (state = HOME_INITIAL_STATE, action = {}) => {
         posts: payload,
       }
     
+    // Removed complex real-time reducer cases - keeping it simple
+    
     case HOME_ACTION_TYPES.SET_IS_CREATE_POST_OPEN:
       return {
         ...state,

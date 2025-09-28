@@ -59,7 +59,7 @@ export const Select: React.FC<SelectProps> = ({
     : options;
 
   const getContainerStyles = () => {
-    const baseStyles = [styles.container];
+    const baseStyles: any[] = [styles.container];
     
     if (disabled) baseStyles.push(styles.disabled);
     if (error) baseStyles.push(styles.error);
@@ -91,7 +91,7 @@ export const Select: React.FC<SelectProps> = ({
   };
 
   const getTextStyles = () => {
-    const baseStyles = [styles.text];
+    const baseStyles: any[] = [styles.text];
     
     switch (size) {
       case 'small':

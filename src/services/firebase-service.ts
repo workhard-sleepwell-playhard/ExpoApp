@@ -224,34 +224,9 @@ export interface User {
   };
 }
 
-export interface Task {
-  taskId: string;
-  userId: string;
-  title: string;
-  description?: string;
-  completed: boolean;
-  priority: 'low' | 'medium' | 'high';
-  category?: string;
-  dueDate?: Timestamp;
-  dueTime?: string;
-  tags?: string[];
-  subtasks?: Subtask[];
-  timeSpent: number;
-  estimatedTime?: number;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-  completedAt?: Timestamp;
-  isSelected: boolean;
-  points: number;
-  difficulty: 'easy' | 'medium' | 'hard';
-}
+// Task interface removed - using simple object structure in Realtime Database
 
-export interface Subtask {
-  id: string;
-  title: string;
-  completed: boolean;
-  createdAt: Timestamp;
-}
+// Subtask interface removed - using simple object structure in Realtime Database
 
 export interface Post {
   postId: string;
@@ -375,25 +350,7 @@ export interface AchievementBadge {
   createdAt: Timestamp;
 }
 
-export interface Comment {
-  commentId: string;
-  postId: string;
-  userId: string;
-  userDisplayName: string;
-  userAvatar?: string;
-  userUsername?: string;
-  content: string;
-  parentCommentId?: string; // For nested replies
-  replies?: string[]; // Array of comment IDs
-  engagement: {
-    likes: number;
-    replies: number;
-  };
-  isEdited?: boolean;
-  editedAt?: Timestamp;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-}
+// Comment interface removed - using simple object structure in Realtime Database
 
 export interface PostReaction {
   reactionId: string;
@@ -619,27 +576,7 @@ export interface MonthlyAnalytics {
   updatedAt: Timestamp;
 }
 
-export interface PointsActivity {
-  activityId: string;
-  userId: string;
-  timestamp: Timestamp;
-  time: string; // 'HH:MM AM/PM' format
-  points: number;
-  totalPoints: number; // cumulative points for the day
-  activity: string;
-  activityType: 'task' | 'achievement' | 'social' | 'streak' | 'bonus';
-  categoryId?: string;
-  taskId?: string;
-  achievementId?: string;
-  postId?: string;
-  pointsBreakdown: {
-    basePoints: number;
-    bonusPoints: number;
-    streakBonus: number;
-    categoryBonus: number;
-  };
-  createdAt: Timestamp;
-}
+// PointsActivity interface removed - using simple object structure in Realtime Database
 
 export interface TaskCompletionAnalytics {
   analyticsId: string;
@@ -874,14 +811,7 @@ export class UserService {
     });
   }
 
-  // Update task statistics
-  static async updateTaskStats(userId: string, taskStats: Partial<User['taskStats']>): Promise<void> {
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
-      'taskStats': taskStats,
-      updatedAt: serverTimestamp()
-    });
-  }
+  // updateTaskStats removed - using SimpleRealtimeService for task stats
 
   // Update time tracking stats
   static async updateTimeTracking(userId: string, timeTracking: Partial<User['timeTracking']>): Promise<void> {
@@ -901,26 +831,9 @@ export class UserService {
     });
   }
 
-  // Award achievement badge
-  static async awardBadge(userId: string, badgeId: string, points: number): Promise<void> {
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
-      'achievements.badgesEarned': serverTimestamp(), // This will be handled by Cloud Function
-      'achievements.totalPoints': serverTimestamp(), // This will be handled by Cloud Function
-      [`achievements.badgesProgress.${badgeId}.isCompleted`]: true,
-      [`achievements.badgesProgress.${badgeId}.completedAt`]: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-  }
+  // awardBadge removed - using SimpleRealtimeService for achievements
 
-  // Update social media stats
-  static async updateSocialStats(userId: string, socialStats: Partial<User['socialStats']>): Promise<void> {
-    const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
-      'socialStats': socialStats,
-      updatedAt: serverTimestamp()
-    });
-  }
+  // updateSocialStats removed - using SimpleRealtimeService for social stats
 
   // Update daily goals
   static async updateDailyGoals(userId: string, date: string, tasksCompleted: number, goal: number): Promise<void> {
@@ -935,20 +848,7 @@ export class UserService {
     });
   }
 
-  // Get all users (for leaderboards - reuses existing data)
-  static async getAllUsers(limitCount: number = 50): Promise<User[]> {
-    try {
-      const usersRef = collection(db, 'users');
-      const querySnapshot = await getDocs(usersRef);
-      const users = querySnapshot.docs.map(doc => ({ userId: doc.id, ...doc.data() } as User));
-      
-      // Return limited results
-      return users.slice(0, limitCount);
-    } catch (error) {
-      console.error('Error fetching all users:', error);
-      return [];
-    }
-  }
+  // getAllUsers removed - using SimpleRealtimeService for leaderboards
 
   // Listen to user changes in real-time
   static async listenToUser(userId: string, callback: (user: User | null) => void): Promise<() => void> {
@@ -978,74 +878,7 @@ export class UserService {
   }
 }
 
-// Task Service
-export class TaskService {
-  static async createTask(taskData: Omit<Task, 'taskId' | 'createdAt' | 'updatedAt'>): Promise<string> {
-    const tasksRef = collection(db, 'tasks');
-    const docRef = await addDoc(tasksRef, {
-      ...taskData,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    return docRef.id;
-  }
-
-  static async getTask(taskId: string): Promise<Task | null> {
-    const taskRef = doc(db, 'tasks', taskId);
-    const taskSnap = await getDoc(taskRef);
-    return taskSnap.exists() ? { taskId, ...taskSnap.data() } as Task : null;
-  }
-
-  static async getTasksByUser(userId: string, limitCount: number = 50): Promise<Task[]> {
-    const tasksRef = collection(db, 'tasks');
-    const q = query(
-      tasksRef,
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc'),
-      limit(limitCount)
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ taskId: doc.id, ...doc.data() } as Task));
-  }
-
-  static async getTasksByCategory(userId: string, category: string): Promise<Task[]> {
-    const tasksRef = collection(db, 'tasks');
-    const q = query(
-      tasksRef,
-      where('userId', '==', userId),
-      where('category', '==', category),
-      orderBy('createdAt', 'desc')
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ taskId: doc.id, ...doc.data() } as Task));
-  }
-
-  static async updateTask(taskId: string, updates: Partial<Task>): Promise<void> {
-    const taskRef = doc(db, 'tasks', taskId);
-    await updateDoc(taskRef, {
-      ...updates,
-      updatedAt: serverTimestamp(),
-    });
-  }
-
-  static async deleteTask(taskId: string): Promise<void> {
-    const taskRef = doc(db, 'tasks', taskId);
-    await deleteDoc(taskRef);
-  }
-
-  static listenToUserTasks(userId: string, callback: (tasks: Task[]) => void): () => void {
-    const tasksRef = collection(db, 'tasks');
-    const q = query(
-      tasksRef,
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
-    );
-    return onSnapshot(q, (querySnapshot) => {
-      const tasks = querySnapshot.docs.map(doc => ({ taskId: doc.id, ...doc.data() } as Task));
-      callback(tasks);
-    });
-  }
-}
+// TaskService removed - using SimpleRealtimeService for tasks
 
 // Post Service
 export class PostService {
@@ -1108,6 +941,17 @@ export class PostService {
     return onSnapshot(q, (querySnapshot) => {
       const posts = querySnapshot.docs.map(doc => ({ postId: doc.id, ...doc.data() } as Post));
       callback(posts);
+    });
+  }
+
+  // Listen to engagement changes for a specific post
+  static listenToPostEngagement(postId: string, callback: (engagement: any) => void): () => void {
+    const postRef = doc(db, 'posts', postId);
+    return onSnapshot(postRef, (doc) => {
+      if (doc.exists()) {
+        const data = doc.data();
+        callback(data.engagement || { likes: 0, comments: 0, shares: 0 });
+      }
     });
   }
 
@@ -1245,60 +1089,7 @@ export class PostService {
 }
 
 // Comment Service
-export class CommentService {
-  static async createComment(commentData: Omit<Comment, 'commentId' | 'createdAt' | 'updatedAt' | 'engagement'>): Promise<string> {
-    const commentsRef = collection(db, 'comments');
-    const docRef = await addDoc(commentsRef, {
-      ...commentData,
-      engagement: {
-        likes: 0,
-        replies: 0
-      },
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    return docRef.id;
-  }
-
-  static async getCommentsByPost(postId: string, limitCount: number = 50): Promise<Comment[]> {
-    const commentsRef = collection(db, 'comments');
-    const q = query(
-      commentsRef,
-      where('postId', '==', postId),
-      where('parentCommentId', '==', null), // Top-level comments only
-      orderBy('createdAt', 'asc'),
-      limit(limitCount)
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ commentId: doc.id, ...doc.data() } as Comment));
-  }
-
-  static async getCommentReplies(parentCommentId: string): Promise<Comment[]> {
-    const commentsRef = collection(db, 'comments');
-    const q = query(
-      commentsRef,
-      where('parentCommentId', '==', parentCommentId),
-      orderBy('createdAt', 'asc')
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ commentId: doc.id, ...doc.data() } as Comment));
-  }
-
-  static async likeComment(commentId: string, userId: string): Promise<void> {
-    const commentRef = doc(db, 'comments', commentId);
-    const likeRef = doc(collection(db, 'commentLikes'));
-    
-    await setDoc(likeRef, {
-      commentId,
-      userId,
-      createdAt: serverTimestamp()
-    });
-    
-    await updateDoc(commentRef, {
-      updatedAt: serverTimestamp()
-    });
-  }
-}
+// CommentService removed - using SimpleRealtimeService for comments
 
 // User Follow Service
 export class UserFollowService {
@@ -1552,22 +1343,7 @@ export class AnalyticsService {
       ({ analyticsId: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as WeeklyAnalytics) : null;
   }
 
-  // Points Activity Tracking
-  static async getDailyPointsActivity(userId: string, date: string): Promise<PointsActivity[]> {
-    const activitiesRef = collection(db, 'pointsActivity');
-    const q = query(
-      activitiesRef,
-      where('userId', '==', userId),
-      orderBy('timestamp', 'asc')
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs
-      .map(doc => ({ activityId: doc.id, ...doc.data() } as PointsActivity))
-      .filter(activity => {
-        const activityDate = activity.timestamp.toDate().toISOString().split('T')[0];
-        return activityDate === date;
-      });
-  }
+  // getDailyPointsActivity removed - using SimpleRealtimeService for points activity
 
   // Task Completion Analytics
   static async getTaskCompletionAnalytics(userId: string, date: string): Promise<TaskCompletionAnalytics | null> {
@@ -1640,15 +1416,7 @@ export class AnalyticsService {
     ];
   }
 
-  static async getLineChartData(userId: string, date: string): Promise<any[]> {
-    const pointsActivity = await this.getDailyPointsActivity(userId, date);
-    return pointsActivity.map(activity => ({
-      time: activity.time,
-      points: activity.totalPoints,
-      activity: activity.activity,
-      activityType: activity.activityType
-    }));
-  }
+  // getLineChartData removed - using SimpleRealtimeService for chart data
 
   // Category Breakdown for Summary
   static async getCategoryBreakdown(userId: string, date: string): Promise<any[]> {

@@ -1,39 +1,21 @@
-import React from 'react';
-import { StyleSheet, ScrollView, View, TouchableOpacity, Animated, Dimensions, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, ScrollView, TouchableOpacity, Animated, Dimensions, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
 
 // Import Redux selectors and actions
 import { 
-  selectTasks, 
+  selectTaskState, // Consolidated selector
   selectIsCreateTaskOpen, 
-  selectTaskTitle, 
-  selectTaskDescription, 
-  selectSelectedCategory, 
-  selectSelectedPriority, 
-  selectDueDate, 
-  selectDueTime, 
-  selectTaskTags, 
-  selectNewTag, 
-  selectShowOtherTasks, 
-  selectShowProductivityFeatures,
-  selectSelectedTask,
-  selectOtherTasks,
   selectTaskStats
 } from '../../store/task/task.selector';
 import { 
   openCreateTask, 
   closeCreateTask, 
   createTask, 
-  handleTaskSelect,
-  handleTaskToggle,
-  handleDeleteTask,
-  handleToggleOtherTasks,
+  handleEditTask,
   openProductivityFeatures,
-  closeProductivityFeatures,
   addTagToTask,
   removeTagFromTask,
   setTaskTitle,
@@ -43,59 +25,118 @@ import {
   setDueDate,
   setDueTime,
   setTaskTags,
-  setNewTag
+  setNewTag,
+  handleTaskSelect,
+  handleTaskToggle,
+  handleToggleOtherTasks
 } from '../../store/task/task.action';
+// selectUserData removed - not used in this component
+import { useCentralizedListener } from '../../hooks/use-centralized-listener';
 
 // Import new components
 import { TaskHeader } from '../../components/tabscomponents/task/taskHeader.component';
 import { TaskStats } from '../../components/tabscomponents/task/taskStats.component';
 import { TaskCard } from '../../components/tabscomponents/task/taskCard.component';
 import { CreateTaskModal } from '@/components/modals/CreateTaskModal';
+import { Colors } from '@/constants/theme';
 
 const { height: screenHeight } = Dimensions.get('window');
 
-// Task categories and priorities
-const taskCategories = [
-  { id: 'work', name: 'Work', icon: '💼', color: '#FF3B30' },
-  { id: 'personal', name: 'Personal', icon: '🏠', color: '#34C759' },
-  { id: 'health', name: 'Health', icon: '💪', color: '#FF9500' },
-  { id: 'learning', name: 'Learning', icon: '📚', color: '#007AFF' },
-  { id: 'finance', name: 'Finance', icon: '💰', color: '#5856D6' },
-  { id: 'other', name: 'Other', icon: '📝', color: '#8E8E93' },
-];
+// Task categories and priorities - moved to CreateTaskModal component
 
-const priorityLevels = [
-  { id: 'low', name: 'Low', color: '#34C759', icon: '🟢' },
-  { id: 'medium', name: 'Medium', color: '#FF9500', icon: '🟡' },
-  { id: 'high', name: 'High', color: '#FF3B30', icon: '🔴' },
-];
-
-export default function TaskScreen() {
+const TaskScreen = React.memo(function TaskScreen() {
   const dispatch = useDispatch();
   const colorScheme = useColorScheme();
   
-  // Redux state
-  const tasks = useSelector(selectTasks);
+  // Redux state - Optimized to reduce re-renders
+  const taskState = useSelector(selectTaskState); // Consolidated selector
   const isCreateTaskOpen = useSelector(selectIsCreateTaskOpen);
-  const taskTitle = useSelector(selectTaskTitle);
-  const taskDescription = useSelector(selectTaskDescription);
-  const selectedCategory = useSelector(selectSelectedCategory);
-  const selectedPriority = useSelector(selectSelectedPriority);
-  const dueDate = useSelector(selectDueDate);
-  const dueTime = useSelector(selectDueTime);
-  const taskTags = useSelector(selectTaskTags);
-  const newTag = useSelector(selectNewTag);
-  const showOtherTasks = useSelector(selectShowOtherTasks);
-  const showProductivityFeatures = useSelector(selectShowProductivityFeatures);
-  const selectedTask = useSelector(selectSelectedTask);
-  const otherTasks = useSelector(selectOtherTasks);
   const taskStats = useSelector(selectTaskStats);
   
-  // Animation values
-  const containerHeight = React.useRef(new Animated.Value(200)).current;
-  const containerPadding = React.useRef(new Animated.Value(16)).current;
-  const slideAnimation = React.useRef(new Animated.Value(screenHeight * 0.9)).current;
-  const overlayOpacity = React.useRef(new Animated.Value(0)).current;
+  // Extract loading and error states
+  const { isLoading, error } = taskState;
+  
+  // Extract values from taskState to avoid multiple selectors
+  const {
+    taskTitle,
+    taskDescription,
+    selectedCategory,
+    selectedPriority,
+    dueDate,
+    dueTime,
+    taskTags,
+    newTag,
+    selectedTask,
+    otherTasks,
+    showOtherTasks
+  } = taskState;
+  
+  // Initialize only task-related listeners (not all listeners)
+  // This prevents unnecessary re-renders from posts/leaderboards updates
+  useCentralizedListener({
+    enablePosts: false,        // Task tab doesn't need posts
+    enableUserData: false,     // Don't need userData updates on task tab
+    enableTasks: true,         // Need tasks for this tab
+    enableLeaderboards: false  // Task tab doesn't need leaderboards
+  });
+  
+  // Animation state
+  const [slideAnimation] = useState(new Animated.Value(screenHeight));
+  const [overlayOpacity] = useState(new Animated.Value(0));
+  
+  // Container animation - only animate padding, let height be natural
+  const containerPadding = React.useRef(new Animated.Value(0)).current;
+  
+  // Edit mode state
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingTask, setEditingTask] = useState<any>(null);
+  
+  // Cleanup animations on unmount
+  React.useEffect(() => {
+    return () => {
+      slideAnimation.stopAnimation();
+      overlayOpacity.stopAnimation();
+      containerPadding.stopAnimation();
+    };
+  }, [slideAnimation, overlayOpacity, containerPadding]);
+  
+  // Handle modal opening animation
+  React.useEffect(() => {
+    if (isCreateTaskOpen) {
+      Animated.parallel([
+        Animated.timing(slideAnimation, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(overlayOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isCreateTaskOpen, slideAnimation, overlayOpacity]);
+
+  // Initialize container padding when a task is selected
+  React.useEffect(() => {
+    if (selectedTask) {
+      // Set initial padding for selected task - minimal padding
+      Animated.timing(containerPadding, {
+        toValue: 8,
+        duration: 0,
+        useNativeDriver: false,
+      }).start();
+    } else {
+      // No selected task, no padding
+      Animated.timing(containerPadding, {
+        toValue: 0,
+        duration: 0,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [selectedTask, containerPadding]);
+  
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -106,30 +147,26 @@ export default function TaskScreen() {
     }
   };
 
-  const handleTaskSelect = (taskId: number) => {
+  const onTaskSelect = (taskId: string | number) => {
     dispatch(handleTaskSelect(taskId));
   };
 
-  const handleTaskToggle = (taskId: number) => {
+  const onTaskToggle = (taskId: string | number) => {
     dispatch(handleTaskToggle(taskId));
   };
 
-  const handleToggleOtherTasks = () => {
+  const onToggleOtherTasks = () => {
+    const newShowOtherTasks = !showOtherTasks;
     dispatch(handleToggleOtherTasks());
     
-    // Animate container expansion/collapse
-    Animated.parallel([
-      Animated.timing(containerHeight, {
-        toValue: !showOtherTasks ? 350 : 200,
-        duration: 300,
-        useNativeDriver: false,
-      }),
+    // Only animate padding if there's a selected task - minimal padding
+    if (selectedTask) {
       Animated.timing(containerPadding, {
-        toValue: !showOtherTasks ? 32 : 16,
+        toValue: newShowOtherTasks ? 12 : 8,
         duration: 300,
         useNativeDriver: false,
-      })
-    ]).start();
+      }).start();
+    }
   };
 
   const handleOpenCreateTask = () => {
@@ -148,6 +185,40 @@ export default function TaskScreen() {
     ]).start();
   };
 
+  const resetTaskForm = () => {
+    dispatch(setTaskTitle(''));
+    dispatch(setTaskDescription(''));
+    dispatch(setSelectedCategory('work'));
+    dispatch(setSelectedPriority('medium'));
+    dispatch(setDueDate(''));
+    dispatch(setDueTime(''));
+    dispatch(setTaskTags([]));
+    dispatch(setNewTag(''));
+    setIsEditMode(false);
+    setEditingTask(null);
+  };
+
+  const handleEditTaskClick = (taskId: string | number) => {
+    const taskToEdit = taskState.tasks.find((task: any) => task.id === taskId);
+    if (taskToEdit) {
+      setEditingTask(taskToEdit);
+      setIsEditMode(true);
+      
+      // Populate form with task data
+      dispatch(setTaskTitle(taskToEdit.title));
+      dispatch(setTaskDescription(taskToEdit.description || ''));
+      dispatch(setSelectedCategory(taskToEdit.category));
+      dispatch(setSelectedPriority(taskToEdit.priority));
+      dispatch(setDueDate(taskToEdit.dueDate || ''));
+      dispatch(setDueTime(taskToEdit.dueTime || ''));
+      dispatch(setTaskTags(taskToEdit.tags || []));
+      dispatch(setNewTag(''));
+      
+      // Open modal
+      dispatch(openCreateTask());
+    }
+  };
+
   const handleCloseCreateTask = () => {
     Animated.parallel([
       Animated.timing(slideAnimation, {
@@ -162,6 +233,8 @@ export default function TaskScreen() {
       }),
     ]).start(() => {
       dispatch(closeCreateTask());
+      // Reset form after closing
+      resetTaskForm();
     });
   };
 
@@ -177,24 +250,43 @@ export default function TaskScreen() {
 
   const handleCreateTask = () => {
     if (taskTitle.trim()) {
-      const taskData = {
-        title: taskTitle,
-        description: taskDescription,
-        completed: false,
-        priority: selectedPriority,
-        category: selectedCategory,
-        dueDate: dueDate || '2024-12-31',
-        dueTime: dueTime || null,
-        isSelected: false,
-        tags: taskTags,
-        subtasks: [],
-      };
+      if (isEditMode && editingTask) {
+        // Edit existing task
+        const updatedTaskData = {
+          title: taskTitle,
+          description: taskDescription,
+          priority: selectedPriority,
+          category: selectedCategory,
+          dueDate: dueDate || '2024-12-31',
+          dueTime: dueTime || null,
+          tags: taskTags,
+        };
+        
+        dispatch(handleEditTask(editingTask.id, updatedTaskData));
+      } else {
+        // Create new task
+        const taskData = {
+          title: taskTitle,
+          description: taskDescription,
+          completed: false,
+          priority: selectedPriority,
+          category: selectedCategory,
+          dueDate: dueDate || '2024-12-31',
+          dueTime: dueTime || null,
+          isSelected: false,
+          tags: taskTags,
+          subtasks: [],
+        };
+        
+        dispatch(createTask(taskData));
+      }
       
-      dispatch(createTask(taskData));
+      // Close modal after successful task creation/update
+      handleCloseCreateTask();
     }
   };
 
-  const handleDeleteTask = (taskId: number) => {
+  const handleDeleteTask = (taskId: string | number) => {
     Alert.alert(
       'Delete Task',
       'Are you sure you want to delete this task?',
@@ -215,75 +307,80 @@ export default function TaskScreen() {
     dispatch(openProductivityFeatures());
   };
 
-  const handleCloseProductivityFeatures = () => {
-    dispatch(closeProductivityFeatures());
-  };
+  // handleCloseProductivityFeatures removed - not used in UI
 
   // Stats are now calculated in Redux selector
 
   return (
-    <ScrollView style={styles.container}>
-      <TaskHeader onAddTask={handleOpenCreateTask} />
-      <TaskStats 
-        pendingCount={taskStats.pendingCount}
-        completedCount={taskStats.completedCount}
-        progressPercentage={taskStats.progressPercentage}
-      />
-
-      {/* Main Selected Task */}
-      {selectedTask && (
-        <Animated.View style={[styles.mainTaskContainer, {
-          height: containerHeight,
-          paddingVertical: containerPadding,
-        }]}>
-          <ThemedText style={styles.sectionTitle}>Current Focus</ThemedText>
-          <TaskCard
-            task={selectedTask}
-            isMainTask={true}
-            onToggle={handleTaskToggle}
-            onSelect={handleTaskSelect}
-            onDelete={handleDeleteTask}
-            onProductivity={handleOpenProductivityFeatures}
-            getPriorityColor={getPriorityColor}
-          />
-
-          {/* Toggle Button for Other Tasks */}
-          <TouchableOpacity 
-            style={styles.toggleButton}
-            onPress={handleToggleOtherTasks}
-          >
-            <ThemedText style={styles.toggleButtonText}>
-              {showOtherTasks ? 'Hide Tasks' : 'Show Tasks'} ({otherTasks.length})
-            </ThemedText>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
-
-      {/* Other Tasks (Inline Toggleable) */}
-      {showOtherTasks && (
-        <>
-          {otherTasks.map((task: any) => (
+    <>
+      <ScrollView style={styles.container}>
+        <TaskHeader onAddTask={handleOpenCreateTask} />
+        <TaskStats 
+          pendingCount={taskStats.pendingCount}
+          completedCount={taskStats.completedCount}
+          progressPercentage={taskStats.progressPercentage}
+        />
+        {/* Main Selected Task */}
+        {selectedTask && (
+          <Animated.View style={[styles.mainTaskContainer, {
+            paddingVertical: containerPadding,
+          }]}>
+            <ThemedText style={styles.sectionTitle}>Current Focus</ThemedText>
             <TaskCard
-              key={task.id}
-              task={task}
-              isMainTask={false}
-              onToggle={handleTaskToggle}
-              onSelect={handleTaskSelect}
+              task={selectedTask}
+              isMainTask={true}
+              onToggle={onTaskToggle}
+              onSelect={onTaskSelect}
               onDelete={handleDeleteTask}
+              onEdit={handleEditTaskClick}
               onProductivity={handleOpenProductivityFeatures}
               getPriorityColor={getPriorityColor}
             />
-          ))}
-        </>
-      )}
+          </Animated.View>
+        )}
+        {/* Toggle Button for Other Tasks - Always Visible */}
+        <TouchableOpacity 
+          style={styles.toggleButton}
+          onPress={onToggleOtherTasks}
+        >
+          <ThemedText style={styles.toggleButtonText}>
+            {showOtherTasks ? 'Hide Tasks' : 'Show Tasks'} ({otherTasks.length})
+          </ThemedText>
+        </TouchableOpacity>
 
-      {/* Create Task Modal */}
+      
+
+        {/* Other Tasks (Inline Toggleable) */}
+        {showOtherTasks && (
+          <>
+            {otherTasks.map((task: any) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                isMainTask={false}
+                onToggle={onTaskToggle}
+                onSelect={onTaskSelect}
+                onDelete={handleDeleteTask}
+                onEdit={handleEditTaskClick}
+                onProductivity={handleOpenProductivityFeatures}
+                getPriorityColor={getPriorityColor}
+              />
+            ))}
+          </>
+        )}
+      </ScrollView>
+
+      {/* Create Task Modal - Outside ScrollView for independent positioning */}
       <CreateTaskModal
         visible={isCreateTaskOpen}
         onClose={handleCloseCreateTask}
         onSave={handleCreateTask}
         slideAnimation={slideAnimation}
         overlayOpacity={overlayOpacity}
+        isLoading={isLoading}
+        error={error}
+        isEditMode={isEditMode}
+        editTask={editingTask}
         taskTitle={taskTitle}
         setTaskTitle={(title) => dispatch(setTaskTitle(title))}
         taskDescription={taskDescription}
@@ -303,9 +400,11 @@ export default function TaskScreen() {
         onAddTag={addTag}
         onRemoveTag={removeTag}
       />
-    </ScrollView>
+    </>
   );
-}
+});
+
+export default TaskScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -313,24 +412,24 @@ const styles = StyleSheet.create({
   },
   mainTaskContainer: {
     paddingHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 4,  // Reduced from 20 to 4
     overflow: 'hidden',
     position: 'relative',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 8,  // Reduced from 12
     color: '#333333',
   },
   toggleButton: {
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
-    paddingVertical: 12,
+    paddingVertical: 8,  // Reduced from 12
     paddingHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 8,
+    marginTop: 2,  // Reduced from 8
+    marginBottom: 4,  // Reduced from 8
   },
   toggleButtonText: {
     fontSize: 14,

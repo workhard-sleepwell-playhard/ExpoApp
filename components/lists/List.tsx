@@ -43,7 +43,7 @@ export const List = <T,>({
   const isDark = colorScheme === 'dark';
 
   const getContainerStyles = () => {
-    const baseStyles = [styles.container];
+    const baseStyles: any[] = [styles.container];
     
     switch (variant) {
       case 'card':

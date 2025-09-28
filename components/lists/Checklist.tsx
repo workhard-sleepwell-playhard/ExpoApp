@@ -46,7 +46,7 @@ export const Checklist: React.FC<ChecklistProps> = ({
   const progressPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
   const getContainerStyles = () => {
-    const baseStyles = [styles.container];
+    const baseStyles: any[] = [styles.container];
     
     switch (variant) {
       case 'card':

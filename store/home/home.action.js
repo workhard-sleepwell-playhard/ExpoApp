@@ -1,10 +1,25 @@
 import { HOME_ACTION_TYPES } from './home.types.js'
-import { PostService } from '../../src/services/firebase-service.ts'
+import { SimpleRealtimeService } from '../../src/services/simple-realtime'
+
+// Helper functions for content parsing
+const extractHashtags = (content) => {
+  if (!content) return [];
+  const hashtagRegex = /#[\w\u0590-\u05ff]+/g;
+  return content.match(hashtagRegex) || [];
+};
+
+const extractMentions = (content) => {
+  if (!content) return [];
+  const mentionRegex = /@[\w\u0590-\u05ff]+/g;
+  return content.match(mentionRegex) || [];
+};
 
 export const setPosts = (posts) => ({
   type: HOME_ACTION_TYPES.SET_POSTS,
   payload: posts
 })
+
+// Removed complex real-time actions - keeping it simple
 
 export const setIsCreatePostOpen = (isOpen) => ({
   type: HOME_ACTION_TYPES.SET_IS_CREATE_POST_OPEN,
@@ -51,10 +66,7 @@ export const deletePost = (postId) => ({
   payload: postId
 })
 
-export const likePost = (postId) => ({
-  type: HOME_ACTION_TYPES.LIKE_POST,
-  payload: postId
-})
+// Removed likePost - handling likes directly in Realtime Database
 
 export const resetPostForm = () => ({
   type: HOME_ACTION_TYPES.RESET_POST_FORM
@@ -91,17 +103,23 @@ export const createPost = (postData) => {
         throw new Error('No authenticated user found');
       }
 
+      // Use the user data that's already passed from the component
+      // This ensures we use the same data that's displayed in the UI
+      const userDisplayName = postData.user.name;
+      const userAvatar = postData.user.avatar;
+      const userUsername = postData.user.username;
+
       // Prepare Firebase post data, filtering out undefined values
       const firebasePostData = {
         userId: currentUser.uid, // Use actual user UID
-        userDisplayName: postData.user.name,
-        userAvatar: postData.user.avatar,
-        userUsername: postData.user.username,
+        userDisplayName: userDisplayName,
+        userAvatar: userAvatar,
+        userUsername: userUsername,
         content: postData.content,
         type: postData.type,
         visibility: postData.isPublic ? 'public' : 'private',
-        hashtags: [], // TODO: Extract hashtags from content
-        mentions: [], // TODO: Extract mentions from content
+        hashtags: extractHashtags(postData.content),
+        mentions: extractMentions(postData.content)
       };
 
       // Only add media if it has content
@@ -109,7 +127,21 @@ export const createPost = (postData) => {
         firebasePostData.media = mediaData;
       }
 
-      const postId = await PostService.createPost(firebasePostData)
+      const postId = await SimpleRealtimeService.createPost(firebasePostData)
+
+      // Initialize user points if not exists
+      await SimpleRealtimeService.initializeUserPoints(currentUser.uid)
+      
+      // Update social stats for post creation
+      await SimpleRealtimeService.updateSocialStats(currentUser.uid, 'post')
+      
+      // Add points activity
+      await SimpleRealtimeService.addPointsActivity(currentUser.uid, {
+        activity: 'Created a new post',
+        activityType: 'social',
+        points: 10,
+        postId: postId
+      })
 
       // Create local post object for immediate UI update
       const { posts } = getState().home
@@ -151,7 +183,7 @@ export const createPost = (postData) => {
   }
 }
 
-export const handleLikePost = (postId) => likePost(postId)
+// Removed handleLikePost - handling likes directly in Realtime Database
 
 export const addImageToPost = (image) => setSelectedImages([image])
 
@@ -171,7 +203,7 @@ export const deletePostAsync = (postId) => {
       })
 
       // Delete post from Firebase (postId should be the Firebase document ID)
-      await PostService.deletePost(postId.toString())
+      await SimpleRealtimeService.deletePost(postId.toString())
 
       // Dispatch SUCCESS action
       dispatch({ 
@@ -196,69 +228,13 @@ export const deletePostAsync = (postId) => {
   }
 }
 
-// Async thunk function for fetching posts with Firebase integration
-export const fetchPosts = (userId = null) => {
-  return async (dispatch, getState) => {
-    try {
-      // Dispatch REQUEST action to show loading state
-      dispatch({ 
-        type: HOME_ACTION_TYPES.FETCH_POSTS_REQUEST 
-      })
-
-      let posts;
-      
-      if (userId) {
-        // Fetch posts by specific user
-        console.log('Fetching posts for user:', userId);
-        posts = await PostService.getPostsByUser(userId, 50)
-      } else {
-        // Fetch all public posts
-        console.log('Fetching all public posts');
-        posts = await PostService.getPosts(50)
-      }
-
-      // Transform Firebase posts to match our local post format
-      const transformedPosts = posts.map(firebasePost => ({
-        id: firebasePost.postId, // Use Firebase document ID as local id
-        postId: firebasePost.postId, // Keep Firebase document ID for deletion
-        userId: firebasePost.userId, // Add userId for filtering
-        user: {
-          name: firebasePost.userDisplayName,
-          avatar: firebasePost.userAvatar || '👤',
-          username: firebasePost.userUsername || '@user'
-        },
-        content: firebasePost.content,
-        image: firebasePost.media?.images?.[0] || null,
-        video: firebasePost.media?.videos?.[0] || null,
-        type: firebasePost.type || 'general',
-        isPublic: firebasePost.visibility === 'public',
-        timestamp: firebasePost.createdAt?.toDate?.() ? 
-          firebasePost.createdAt.toDate().toLocaleDateString() : 'now',
-        likes: firebasePost.engagement?.likes || 0,
-        comments: firebasePost.engagement?.comments || 0,
-        shares: firebasePost.engagement?.shares || 0,
-        isLiked: false, // TODO: Check if current user has liked this post
-      }))
-
-      // Dispatch SUCCESS action
-      dispatch({ 
-        type: HOME_ACTION_TYPES.FETCH_POSTS_SUCCESS, 
-        payload: transformedPosts 
-      })
-
-      // Also set posts in local state for immediate UI update
-      dispatch(setPosts(transformedPosts))
-
-      return transformedPosts
-    } catch (error) {
-      // Dispatch ERROR action
-      dispatch({ 
-        type: HOME_ACTION_TYPES.FETCH_POSTS_ERROR, 
-        payload: error.message 
-      })
-      
-      // Re-throw error so calling code can handle it
-      throw error
-    }
+// Simple fetch posts function using Realtime Database
+export const fetchPosts = async () => {
+  try {
+    const posts = await SimpleRealtimeService.getPosts();
+    return posts;
+  } catch (error) {
+    console.error('Error fetching posts:', error);
+    throw error;
   }
 }

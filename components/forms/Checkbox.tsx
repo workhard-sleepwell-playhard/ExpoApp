@@ -53,7 +53,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
 
   const getCheckboxStyles = () => {
     const checkboxSize = getCheckboxSize();
-    const baseStyles = [
+    const baseStyles: any[] = [
       styles.checkbox,
       { width: checkboxSize, height: checkboxSize }
     ];
@@ -106,7 +106,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
   };
 
   const getLabelStyles = () => {
-    const baseStyles = [styles.label];
+    const baseStyles: any[] = [styles.label];
     
     switch (size) {
       case 'small':
