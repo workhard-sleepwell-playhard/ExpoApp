@@ -22,6 +22,7 @@ class CentralizedListenerService {
       onUserProfileUpdate?: (userData: any) => void;
       onUserTasksUpdate?: (tasks: any[]) => void;
       onLeaderboardsUpdate?: (leaderboards: any) => void;
+      onTrackingDataUpdate?: (trackingData: any) => void;
     }
   ) {
     // Allow multiple initializations - just add new listeners if they don't exist
@@ -57,6 +58,19 @@ class CentralizedListenerService {
         callbacks.onLeaderboardsUpdate
       );
       this.listeners.set('leaderboards', unsubscribeLeaderboards);
+    }
+
+    // Tracking data listener - only set up if not already exists
+    if (callbacks.onTrackingDataUpdate && userId && !this.listeners.has('trackingData')) {
+      const unsubscribeTrackingData = SimpleRealtimeService.listenToOptimizedTrackingData(
+        userId,
+        {
+          recentDays: 7, // Optimize for dashboard view
+          sessionLimit: 50 // Limit recent sessions for performance
+        },
+        callbacks.onTrackingDataUpdate
+      );
+      this.listeners.set('trackingData', unsubscribeTrackingData);
     }
 
     this.isInitialized = true;

@@ -1,5 +1,4 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, writeBatch, doc, query, getDocs } from 'firebase/firestore';
 import { getDatabase } from 'firebase/database';
 import { getAuth, 
   GoogleAuthProvider,
@@ -8,7 +7,8 @@ import { getAuth,
   signOut,
   onAuthStateChanged, } from 'firebase/auth';
 import { SimpleRealtimeService } from '../../services/simple-realtime';
-// Note: Storage and Functions might not be needed for basic auth
+// Note: Firestore, Storage and Functions are not needed for this app
+// import { getFirestore } from 'firebase/firestore';
 // import { getStorage } from 'firebase/storage';
 // import { getFunctions } from 'firebase/functions';
 
@@ -27,11 +27,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // Initialize Firebase services
-export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const realtimeDb = getDatabase(app);
-// export const storage = getStorage(app); // Commented out to prevent potential web dependencies
-// export const functions = getFunctions(app); // Commented out to prevent potential web dependencies
+// Note: Only using Realtime Database and Auth for this app
+// export const db = getFirestore(app); // Removed - using Realtime Database instead
+// export const storage = getStorage(app); // Not needed for this app
+// export const functions = getFunctions(app); // Not needed for this app
 
 // Note: Google Auth requires additional setup for React Native
 // For now, we'll disable Google Auth to prevent the window error
@@ -48,30 +49,8 @@ export const signInWithGoogleRedirect = async () => {
 
 export default app;
 
-export const addCollectionAndDocuments = async (
-  collectionKey: string,
-  objectsToAdd: any[],
-  field?: string
-) => {
-  const collectionRef = collection(db, collectionKey);
-  const batch = writeBatch(db);
-
-  objectsToAdd.forEach((object: any) => {
-    const docRef = doc(collectionRef, object.title.toLowerCase());
-    batch.set(docRef, object);
-  });
-
-  await batch.commit();
-  console.log('done');
-};
-
-export const getCategoriesAndDocuments = async () => {
-  const collectionRef = collection(db, 'categories');
-  const q = query(collectionRef);
-
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((docSnapshot: any) => docSnapshot.data())
-}
+// Firestore utility functions removed - using Realtime Database instead
+// Use SimpleRealtimeService for all data operations
 
 export const createUserDocumentFromAuth = async (
   userAuth: any,

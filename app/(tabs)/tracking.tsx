@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, ScrollView, View, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, ScrollView, View, TouchableOpacity, Dimensions, TextInput, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -10,15 +10,8 @@ import { useCentralizedListener } from '../../hooks/use-centralized-listener';
 
 // Import Redux selectors and actions
 import { 
-  selectTrackingData, 
-  selectWeeklyProgress, 
-  selectTaskCompletionData, 
-  selectDailyPointsData, 
-  selectCurrentSlide, 
-  selectTimePeriod, 
-  selectShowCustomDatePicker, 
-  selectCustomDateFrom, 
-  selectCustomDateTo,
+  selectTrackingState,
+  selectWeeklyProgress,
   selectSlides,
   selectCurrentSlideData,
   selectMaxHours,
@@ -27,21 +20,32 @@ import {
   selectMaxPoints,
   selectTotalPoints,
   selectTimePeriodLabel,
-  selectTimePeriodIcon
+  selectTimePeriodIcon,
+  selectCustomDateFrom,
+  selectCustomDateTo
 } from '../../store/tracking/tracking.selector';
+import { selectUserData } from '../../store/profile/profile.selector';
 import { 
   handleNextSlide, 
   handlePrevSlide, 
   handleNavigateTimePeriod, 
+  navigateTimePeriodWithData,
   handleCustomDateClick,
   handleCloseCustomDatePicker, 
-  handleApplyCustomDateRange
+  handleApplyCustomDateRange,
+  createSampleData,
+  setCustomDateFrom,
+  setCustomDateTo,
+  loadCustomDateRangeData
 } from '../../store/tracking/tracking.action';
 
 // Import new components
 import { TrackingHeader } from '../../components/tabscomponents/tracking/trackingHeader.component';
 import { SummaryCard } from '../../components/tabscomponents/tracking/trackingSummaryCard.component';
 import { TimePeriodSelector } from '../../components/tabscomponents/tracking/trackingTimePeriodSelector.component';
+import { CustomDatePicker } from '../../components/tabscomponents/tracking/CustomDatePicker.component';
+import { EmptyStateCard } from '../../components/tabscomponents/tracking/EmptyStateCard.component';
+import { SimpleRealtimeService } from '../../src/services/simple-realtime';
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -49,18 +53,95 @@ export default function TrackingScreen() {
   const dispatch = useDispatch();
   const colorScheme = useColorScheme();
   
-  // Initialize centralized listeners
-  useCentralizedListener();
+  // Custom date picker state
+  const [isLoadingCustomData, setIsLoadingCustomData] = useState(false);
   
-  // Redux state
-  const trackingData = useSelector(selectTrackingData);
-  const weeklyProgress = useSelector(selectWeeklyProgress);
-  const taskCompletionData = useSelector(selectTaskCompletionData);
-  const dailyPointsData = useSelector(selectDailyPointsData);
-  const currentSlide = useSelector(selectCurrentSlide);
-  const timePeriod = useSelector(selectTimePeriod);
-  const showCustomDatePicker = useSelector(selectShowCustomDatePicker);
-  // customDateFrom and customDateTo removed - not used in UI
+  // Initialize only tracking-related listeners (following home/profile pattern)
+  useCentralizedListener({
+    enablePosts: false,
+    enableUserData: true,      // Single source of truth - user data drives tracking
+    enableTasks: false,
+    enableLeaderboards: false,
+    enableTrackingData: false  // Disabled - only use userData generation (no database conflicts)
+  });
+  
+  // Redux state - Use consolidated selector for better performance
+  const trackingState = useSelector(selectTrackingState);
+  const {
+    // UI State
+    currentSlide,
+    timePeriod,
+    showCustomDatePicker,
+    isLoading,
+    error,
+    
+    // Firebase Data
+    trackingSessions,
+    trackingAnalytics,
+    weeklyProgressData,
+    taskCompletionData,
+    dailyPointsData,
+    categoriesData
+  } = trackingState;
+
+  // Get custom date values
+  const customDateFrom = useSelector(selectCustomDateFrom);
+  const customDateTo = useSelector(selectCustomDateTo);
+  
+  // User data from single source of truth (following home/profile pattern)
+  const userData = useSelector(selectUserData);
+  const userId = userData?.userId;
+
+  // Use real data from Firebase
+  const trackingData = categoriesData; // Categories data for the summary
+  const weeklyProgress = weeklyProgressData; // Real weekly progress data
+  const taskCompletion = taskCompletionData; // Task completion data
+  const dailyPoints = dailyPointsData; // Daily points data
+  
+  // Filter data based on time period
+  const getFilteredData = (data: any[], timePeriod: string) => {
+    if (timePeriod === 'all-time') return data;
+    
+    const now = new Date();
+    const cutoffDate = new Date();
+    
+    switch (timePeriod) {
+      case 'week':
+        cutoffDate.setDate(now.getDate() - 7);
+        break;
+      case 'month':
+        cutoffDate.setMonth(now.getMonth() - 1);
+        break;
+      case 'year':
+        cutoffDate.setFullYear(now.getFullYear() - 1);
+        break;
+      default:
+        return data;
+    }
+    
+    return data.filter(item => {
+      const itemDate = new Date(item.time || item.date || item.createdAt);
+      return itemDate >= cutoffDate;
+    });
+  };
+  
+  // Get filtered data for current time period
+  const filteredDailyPointsData = getFilteredData(dailyPointsData, timePeriod);
+  
+  // Get data limit based on time period
+  const getDataLimit = (timePeriod: string) => {
+    switch (timePeriod) {
+      case 'week': return 7;
+      case 'month': return 14;
+      case 'year': return 30;
+      case 'all-time': return 50;
+      default: return 14;
+    }
+  };
+  
+  const dataLimit = getDataLimit(timePeriod);
+  
+  // Additional selectors for chart data
   const slides = useSelector(selectSlides);
   const currentSlideData = useSelector(selectCurrentSlideData);
   const maxHours = useSelector(selectMaxHours);
@@ -71,13 +152,70 @@ export default function TrackingScreen() {
   const timePeriodLabel = useSelector(selectTimePeriodLabel);
   const timePeriodIcon = useSelector(selectTimePeriodIcon);
 
-  const navigateTimePeriod = (direction: 'prev' | 'next') => {
-    dispatch(handleNavigateTimePeriod(direction));
+  const navigateTimePeriodUI = (direction: 'prev' | 'next') => {
+    dispatch(navigateTimePeriodWithData(direction));
   };
 
   const onCustomDateClick = () => {
     dispatch(handleCustomDateClick());
   };
+
+  const handleCreateSampleData = () => {
+    dispatch(createSampleData());
+  };
+
+  // Check if there's data to display
+  const hasData = () => {
+    const hasWeeklyData = weeklyProgress && weeklyProgress.some((day: any) => day.hours > 0);
+    const hasTaskData = taskCompletion && taskCompletion.some((task: any) => task.value > 0);
+    const hasPointsData = dailyPoints && dailyPoints.some((point: any) => point.points > 0);
+    const hasCategoriesData = trackingData && trackingData.some((cat: any) => cat.hours > 0);
+    
+    return hasWeeklyData || hasTaskData || hasPointsData || hasCategoriesData;
+  };
+
+  // Check if we're in custom date range mode
+  const isCustomDateRange = customDateFrom && customDateTo;
+  
+  // Check if we should show empty state (custom date range OR time period navigation with no data)
+  const shouldShowEmptyState = (isCustomDateRange || timePeriod !== 'week') && !hasData();
+
+  // Custom date picker handlers
+  const handleCustomDateApply = async (fromDate: string, toDate: string) => {
+    try {
+      setIsLoadingCustomData(true);
+      
+      // Update Redux state with selected dates
+      dispatch(setCustomDateFrom(fromDate));
+      dispatch(setCustomDateTo(toDate));
+      dispatch(handleApplyCustomDateRange(fromDate, toDate));
+      
+      if (userId) {
+        // Query analytics data for the selected date range
+        const analyticsData = await SimpleRealtimeService.getDailyAnalyticsInRange(
+          userId, 
+          fromDate, 
+          toDate
+        );
+        
+        console.log('📊 Custom date range analytics loaded:', analyticsData.length, 'items');
+        console.log('📅 Date range:', fromDate, 'to', toDate);
+        
+        // Process and update Redux state with the fetched data
+        dispatch(loadCustomDateRangeData(analyticsData));
+        
+        console.log('✅ Custom date range data applied to UI');
+      } else {
+        console.warn('⚠️ No user ID available for custom date range query');
+      }
+      
+    } catch (error) {
+      console.error('❌ Error loading custom date range data:', error);
+    } finally {
+      setIsLoadingCustomData(false);
+    }
+  };
+
 
   const nextSlide = () => {
     dispatch(handleNextSlide());
@@ -101,7 +239,7 @@ export default function TrackingScreen() {
             ]} 
           />
           <ThemedText style={styles.barLabel}>{day.day}</ThemedText>
-          <ThemedText style={styles.barValue}>{day.hours}h</ThemedText>
+          <ThemedText style={styles.barValue}>{day.hours.toFixed(1)}h</ThemedText>
         </View>
       ))}
     </View>
@@ -120,15 +258,15 @@ export default function TrackingScreen() {
           {/* Pie Chart using two semicircles */}
           <View style={styles.pieChartSemicircle}>
             {/* Top half - Completed (Green) */}
-            <View style={[styles.pieHalf, styles.pieTopHalf, { backgroundColor: taskCompletionData[0]?.color || '#4CAF50' }]} />
+            <View style={[styles.pieHalf, styles.pieTopHalf, { backgroundColor: taskCompletion[0]?.color || '#4CAF50' }]} />
             
             {/* Bottom half - Pending (Red/Orange) */}
-            <View style={[styles.pieHalf, styles.pieBottomHalf, { backgroundColor: taskCompletionData[1]?.color || '#FF5722' }]} />
+            <View style={[styles.pieHalf, styles.pieBottomHalf, { backgroundColor: taskCompletion[1]?.color || '#FF5722' }]} />
           </View>
         </View>
         
         <View style={styles.pieLegend}>
-          {taskCompletionData.map((item: any) => (
+          {taskCompletion.map((item: any) => (
             <View key={item.id} style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: item.color }]} />
               <ThemedText style={styles.legendText}>{item.category}: {item.count} ({item.percentage}%)</ThemedText>
@@ -157,8 +295,9 @@ export default function TrackingScreen() {
         </View>
 
         <View style={styles.lineChart}>
-          {dailyPointsData.map((point: any, index: number) => {
-            const nextPoint = dailyPointsData[index + 1];
+          {filteredDailyPointsData.slice(-dataLimit).map((point: any, index: number) => {
+            const slicedData = filteredDailyPointsData.slice(-dataLimit);
+            const nextPoint = slicedData[index + 1];
             const height = maxPoints > 0 ? (point.points / maxPoints) * 80 : 0;
             const nextHeight = nextPoint && maxPoints > 0 ? (nextPoint.points / maxPoints) * 80 : height;
             
@@ -168,7 +307,12 @@ export default function TrackingScreen() {
                   backgroundColor: Colors[colorScheme ?? 'light'].tint,
                   bottom: height - 4
                 }]} />
-                <ThemedText style={styles.pointTime}>{point.time.split(' ')[0]}</ThemedText>
+                <ThemedText style={styles.pointTime}>
+                  {new Date(point.time).toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric' 
+                  })}
+                </ThemedText>
                 <ThemedText style={styles.pointValue}>{point.points}</ThemedText>
                 
                 {/* Connecting line */}
@@ -186,11 +330,11 @@ export default function TrackingScreen() {
 
         <View style={styles.recentActivity}>
           <ThemedText style={styles.activityTitle}>Recent Activity</ThemedText>
-          {dailyPointsData.slice(-3).map((point: any, index: number) => (
+          {filteredDailyPointsData.slice(-3).map((point: any, index: number) => (
             <View key={index} style={styles.activityItem}>
               <View style={styles.activityDot} />
               <ThemedText style={styles.activityText}>{point.activity}</ThemedText>
-              <ThemedText style={styles.activityPoints}>+{point.points - (dailyPointsData[dailyPointsData.length - 4 + index]?.points || 0)}</ThemedText>
+              <ThemedText style={styles.activityPoints}>+{point.points - (filteredDailyPointsData[filteredDailyPointsData.length - 4 + index]?.points || 0)}</ThemedText>
             </View>
           ))}
         </View>
@@ -200,9 +344,18 @@ export default function TrackingScreen() {
 
   // Summary stats are now calculated in Redux selector
 
+  // Show loading state if userData is not loaded yet (following home tab pattern)
+  if (!userData?.userId) {
+    return (
+      <ThemedView style={styles.container}>
+        <ThemedText style={styles.loadingText}>Loading your tracking data...</ThemedText>
+      </ThemedView>
+    );
+  }
+
   return (
     <ScrollView style={styles.container}>
-      <TrackingHeader />
+        <TrackingHeader onCreateSampleData={handleCreateSampleData} />
       <SummaryCard 
         totalHours={trackingStats.totalHours}
         categories={trackingStats.categories}
@@ -225,99 +378,59 @@ export default function TrackingScreen() {
 
         <TimePeriodSelector
           timePeriod={timePeriod}
-          onNavigate={navigateTimePeriod}
+          onNavigate={navigateTimePeriodUI}
           onCustomDateClick={onCustomDateClick}
           getTimePeriodLabel={() => timePeriodLabel}
           getTimePeriodIcon={() => timePeriodIcon}
         />
         
-        {currentSlideData.type === 'bar' ? renderBarChart() : 
-         currentSlideData.type === 'pie' ? renderPieChart() : renderLineChart()}
+        {/* Show empty state if no data and in custom date range mode or different time period */}
+        {shouldShowEmptyState ? (
+          <EmptyStateCard
+            fromDate={customDateFrom || ''}
+            toDate={customDateTo || ''}
+            isCustomDateRange={isCustomDateRange}
+          />
+        ) : (
+          currentSlideData.type === 'bar' ? renderBarChart() : 
+          currentSlideData.type === 'pie' ? renderPieChart() : renderLineChart()
+        )}
       </ThemedView>
 
       <ThemedView style={styles.categoriesCard}>
         <ThemedText type="subtitle" style={styles.cardTitle}>Categories</ThemedText>
-        {trackingData.map((item: any) => (
-          <View key={item.id} style={styles.categoryItem}>
-            <View style={styles.categoryLeft}>
-              <View style={[styles.categoryIcon, { backgroundColor: item.color }]}>
-                <IconSymbol name={item.icon as any} size={20} color="white" />
-              </View>
-              <ThemedText style={styles.categoryName}>{item.category}</ThemedText>
-            </View>
-            <View style={styles.categoryRight}>
-              <ThemedText type="defaultSemiBold">{item.hours}h</ThemedText>
-              <View style={[styles.progressBar, { backgroundColor: 'rgba(0, 0, 0, 0.1)' }]}>
-                <View 
-                  style={[
-                    styles.progressFill, 
-                    { 
-                      width: `${(item.hours / 10) * 100}%`,
-                      backgroundColor: item.color,
-                    }
-                  ]} 
-                />
-              </View>
-            </View>
+        {shouldShowEmptyState ? (
+          <View style={styles.emptyCategoriesContainer}>
+            <ThemedText style={styles.emptyCategoriesText}>
+              No category data available for the selected {isCustomDateRange ? 'date range' : 'time period'}
+            </ThemedText>
           </View>
-        ))}
+        ) : (
+          trackingData.map((item: any) => (
+            <View key={item.id} style={styles.categoryItem}>
+              <View style={styles.categoryLeft}>
+                <View style={[styles.categoryIcon, { backgroundColor: item.color }]}>
+                  <IconSymbol name={item.icon as any} size={20} color="white" />
+                </View>
+                <ThemedText style={styles.categoryName}>{item.category}</ThemedText>
+              </View>
+              <View style={styles.categoryRight}>
+                <ThemedText type="defaultSemiBold">{item.hours.toFixed(1)}h</ThemedText>
+              </View>
+            </View>
+          ))
+        )}
       </ThemedView>
 
-      {/* Custom Date Picker Overlay - Full Page */}
-      {showCustomDatePicker && (
-        <View style={styles.fullPageOverlay}>
-          <TouchableOpacity 
-            style={styles.overlayBackground}
-            onPress={() => dispatch(handleCloseCustomDatePicker())}
-            activeOpacity={1}
-          >
-            <View style={styles.customDatePicker}>
-              <View style={styles.customDateHeader}>
-                <ThemedText style={styles.customDateTitle}>Custom Date Range</ThemedText>
-                <TouchableOpacity 
-                  style={styles.closeButtonContainer}
-                  onPress={() => dispatch(handleCloseCustomDatePicker())}
-                >
-                  <ThemedText style={styles.closeButton}>✕</ThemedText>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.dateInputs}>
-                <View style={styles.dateInputGroup}>
-                  <ThemedText style={styles.dateLabel}>From</ThemedText>
-                  <TouchableOpacity style={styles.dateButton}>
-                    <ThemedText style={styles.dateButtonText}>2024-01-01</ThemedText>
-                  </TouchableOpacity>
-                </View>
-                
-                <View style={styles.dateInputGroup}>
-                  <ThemedText style={styles.dateLabel}>To</ThemedText>
-                  <TouchableOpacity style={styles.dateButton}>
-                    <ThemedText style={styles.dateButtonText}>2024-01-31</ThemedText>
-                  </TouchableOpacity>
-                </View>
-              </View>
-              
-              <View style={styles.customDateActions}>
-                <TouchableOpacity 
-                  style={styles.applyButton}
-                  onPress={() => {
-                    dispatch(handleApplyCustomDateRange('2024-01-01', '2024-01-31'));
-                  }}
-                >
-                  <ThemedText style={styles.applyButtonText}>Apply</ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.cancelButton}
-                  onPress={() => dispatch(handleCloseCustomDatePicker())}
-                >
-                  <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </TouchableOpacity>
-        </View>
-      )}
+      {/* Custom Date Picker Modal */}
+      <CustomDatePicker
+        visible={showCustomDatePicker}
+        onClose={() => dispatch(handleCloseCustomDatePicker())}
+        onApply={handleCustomDateApply}
+        initialFromDate={customDateFrom}
+        initialToDate={customDateTo}
+      />
+
     </ScrollView>
   );
 }
@@ -325,6 +438,12 @@ export default function TrackingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 50,
+    color: '#666',
   },
   chartCard: {
     margin: 20,
@@ -424,16 +543,6 @@ const styles = StyleSheet.create({
   },
   categoryRight: {
     alignItems: 'flex-end',
-  },
-  progressBar: {
-    width: 60,
-    height: 4,
-    borderRadius: 2,
-    marginTop: 4,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
   },
   // Pie chart styles
   pieChartContainer: {
@@ -561,17 +670,18 @@ const styles = StyleSheet.create({
   },
   lineChart: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     alignItems: 'flex-end',
     height: 80,
-    paddingHorizontal: 10,
+    paddingHorizontal: 5,
     position: 'relative',
     marginBottom: 10,
   },
   lineChartPoint: {
-    flex: 1,
+    minWidth: 40,
     alignItems: 'center',
     position: 'relative',
+    marginHorizontal: 2,
   },
   pointDot: {
     width: 8,
@@ -580,9 +690,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   pointTime: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#666666',
     marginTop: 45,
+    textAlign: 'center',
+    maxWidth: 35,
   },
   pointValue: {
     fontSize: 12,
@@ -651,93 +763,51 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Custom date picker styles
-  customDatePicker: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 12,
-    width: '90%',
-    maxWidth: 320,
-  },
-  customDateHeader: {
+  
+  // Navigation styles
+  navigationContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  customDateTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333333',
-  },
-  closeButtonContainer: {
-    padding: 4,
-    borderRadius: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  closeButton: {
-    fontSize: 18,
-    color: '#666666',
-    fontWeight: 'bold',
-  },
-  dateInputs: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    borderRadius: 12,
+    marginHorizontal: 20,
     marginBottom: 20,
   },
-  dateInputGroup: {
-    marginBottom: 12,
-  },
-  dateLabel: {
-    fontSize: 12,
-    color: '#666666',
-    marginBottom: 6,
-  },
-  dateButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  dateButtonText: {
-    fontSize: 14,
-    color: '#333333',
-  },
-  customDateActions: {
+  navButton: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  applyButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
     borderRadius: 8,
-    flex: 1,
-    marginRight: 8,
+    minWidth: 80,
+    justifyContent: 'center',
   },
-  applyButtonText: {
-    color: 'white',
+  navButtonDisabled: {
+    opacity: 0.5,
+  },
+  navButtonText: {
     fontSize: 14,
+    fontWeight: '600',
+    marginHorizontal: 5,
+  },
+  timePeriodLabel: {
+    fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
   },
-  cancelButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    flex: 1,
-    marginLeft: 8,
+  emptyCategoriesContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  cancelButtonText: {
-    color: '#666666',
+  emptyCategoriesText: {
     fontSize: 14,
-    fontWeight: '500',
+    color: '#666',
     textAlign: 'center',
+    fontStyle: 'italic',
   },
 });

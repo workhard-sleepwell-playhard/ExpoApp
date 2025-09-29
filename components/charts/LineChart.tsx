@@ -20,6 +20,7 @@ export interface LineChartProps {
   showGrid?: boolean;
   size?: 'small' | 'medium' | 'large';
   style?: ViewStyle;
+  formatValue?: (value: number) => string;
 }
 
 export const LineChart: React.FC<LineChartProps> = ({
@@ -32,6 +33,7 @@ export const LineChart: React.FC<LineChartProps> = ({
   showGrid = true,
   size = 'medium',
   style,
+  formatValue = (value) => value.toString(),
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -154,7 +156,7 @@ export const LineChart: React.FC<LineChartProps> = ({
                       }
                     ]}
                   >
-                    {item.value}
+                    {formatValue(item.value)}
                   </ThemedText>
                 )}
                 

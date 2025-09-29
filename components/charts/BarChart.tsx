@@ -19,6 +19,7 @@ export interface BarChartProps {
   orientation?: 'vertical' | 'horizontal';
   size?: 'small' | 'medium' | 'large';
   style?: ViewStyle;
+  formatValue?: (value: number) => string;
 }
 
 export const BarChart: React.FC<BarChartProps> = ({
@@ -30,6 +31,7 @@ export const BarChart: React.FC<BarChartProps> = ({
   orientation = 'vertical',
   size = 'medium',
   style,
+  formatValue = (value) => value.toString(),
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -106,7 +108,7 @@ export const BarChart: React.FC<BarChartProps> = ({
                         { fontSize: textSizes.value }
                       ]}
                     >
-                      {item.value}
+                      {formatValue(item.value)}
                     </ThemedText>
                   )}
                   <View 
@@ -165,7 +167,7 @@ export const BarChart: React.FC<BarChartProps> = ({
                         { fontSize: textSizes.value }
                       ]}
                     >
-                      {item.value}
+                      {formatValue(item.value)}
                     </ThemedText>
                   )}
                 </View>

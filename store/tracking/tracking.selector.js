@@ -2,26 +2,12 @@ import { createSelector } from 'reselect'
 
 const selectTrackingReducer = state => state.tracking
 
-export const selectTrackingData = createSelector(
-  [selectTrackingReducer],
-  (tracking) => tracking.trackingData
-)
+// Utility function to format hours for display (1 decimal place)
+const formatHours = (hours) => {
+  return Math.round(hours * 10) / 10;
+}
 
-export const selectWeeklyProgress = createSelector(
-  [selectTrackingReducer],
-  (tracking) => tracking.weeklyProgress
-)
-
-export const selectTaskCompletionData = createSelector(
-  [selectTrackingReducer],
-  (tracking) => tracking.taskCompletionData
-)
-
-export const selectDailyPointsData = createSelector(
-  [selectTrackingReducer],
-  (tracking) => tracking.dailyPointsData
-)
-
+// Individual selectors for specific data
 export const selectCurrentSlide = createSelector(
   [selectTrackingReducer],
   (tracking) => tracking.currentSlide
@@ -56,6 +42,43 @@ export const selectError = createSelector(
   [selectTrackingReducer],
   (tracking) => tracking.error
 )
+
+// Firebase Data Selectors
+export const selectTrackingSessions = createSelector(
+  [selectTrackingReducer],
+  (tracking) => tracking.trackingSessions
+)
+
+export const selectTrackingAnalytics = createSelector(
+  [selectTrackingReducer],
+  (tracking) => tracking.trackingAnalytics
+)
+
+export const selectWeeklyProgressData = createSelector(
+  [selectTrackingReducer],
+  (tracking) => tracking.weeklyProgressData
+)
+
+// Alias for backward compatibility
+export const selectWeeklyProgress = selectWeeklyProgressData
+
+export const selectTaskCompletionData = createSelector(
+  [selectTrackingReducer],
+  (tracking) => tracking.taskCompletionData
+)
+
+export const selectDailyPointsData = createSelector(
+  [selectTrackingReducer],
+  (tracking) => tracking.dailyPointsData
+)
+
+export const selectCategoriesData = createSelector(
+  [selectTrackingReducer],
+  (tracking) => tracking.categoriesData
+)
+
+// Alias for backward compatibility - maps to categoriesData
+export const selectTrackingData = selectCategoriesData
 
 // Derived selectors
 export const selectTimePeriodOptions = createSelector(
@@ -133,12 +156,12 @@ export const selectCurrentSlideData = createSelector(
 
 export const selectMaxHours = createSelector(
   [selectWeeklyProgress],
-  (weeklyProgress) => Math.max(...weeklyProgress.map(p => p.hours), 0)
+  (weeklyProgress) => formatHours(Math.max(...weeklyProgress.map(p => p.hours), 0))
 )
 
 export const selectTotalHours = createSelector(
   [selectTrackingData],
-  (trackingData) => trackingData.reduce((sum, item) => sum + (item.hours || 0), 0)
+  (trackingData) => formatHours(trackingData.reduce((sum, item) => sum + (item.hours || 0), 0))
 )
 
 export const selectCategories = createSelector(
@@ -185,4 +208,29 @@ export const selectTotalPoints = createSelector(
     const lastEntry = dailyPointsData[dailyPointsData.length - 1]
     return lastEntry ? lastEntry.points : 0
   }
+)
+
+
+// Consolidated selector to reduce re-renders (following home/task pattern)
+export const selectTrackingState = createSelector(
+  [selectTrackingReducer],
+  (tracking) => ({
+    // UI State
+    currentSlide: tracking.currentSlide,
+    timePeriod: tracking.timePeriod,
+    showCustomDatePicker: tracking.showCustomDatePicker,
+    customDateFrom: tracking.customDateFrom,
+    customDateTo: tracking.customDateTo,
+    isLoading: tracking.isLoading,
+    error: tracking.error,
+    
+    // Firebase Data
+    trackingSessions: tracking.trackingSessions,
+    trackingAnalytics: tracking.trackingAnalytics,
+    weeklyProgressData: tracking.weeklyProgressData,
+    taskCompletionData: tracking.taskCompletionData,
+    dailyPointsData: tracking.dailyPointsData,
+    categoriesData: tracking.categoriesData,
+    
+  })
 )
