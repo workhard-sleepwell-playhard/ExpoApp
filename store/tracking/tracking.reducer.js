@@ -12,7 +12,6 @@ export const TRACKING_INITIAL_STATE = {
   
   // Firebase Data (new pattern)
   trackingSessions: [],
-  trackingAnalytics: [],
   weeklyProgressData: [],
   taskCompletionData: [],
   dailyPointsData: [],
@@ -99,11 +98,6 @@ export const trackingReducer = (state = TRACKING_INITIAL_STATE, action = {}) => 
         trackingSessions: payload,
       }
     
-    case TRACKING_ACTION_TYPES.SET_TRACKING_ANALYTICS:
-      return {
-        ...state,
-        trackingAnalytics: payload,
-      }
     
     case TRACKING_ACTION_TYPES.SET_WEEKLY_PROGRESS_DATA:
       return {
@@ -145,28 +139,6 @@ export const trackingReducer = (state = TRACKING_INITIAL_STATE, action = {}) => 
       }
     
     case TRACKING_ACTION_TYPES.CREATE_SESSION_ERROR:
-      return {
-        ...state,
-        isLoading: false,
-        error: payload,
-      }
-    
-    // Async action handlers for create analytics
-    case TRACKING_ACTION_TYPES.CREATE_ANALYTICS_REQUEST:
-      return {
-        ...state,
-        isLoading: true,
-        error: null,
-      }
-    
-    case TRACKING_ACTION_TYPES.CREATE_ANALYTICS_SUCCESS:
-      return {
-        ...state,
-        isLoading: false,
-        error: null,
-      }
-    
-    case TRACKING_ACTION_TYPES.CREATE_ANALYTICS_ERROR:
       return {
         ...state,
         isLoading: false,

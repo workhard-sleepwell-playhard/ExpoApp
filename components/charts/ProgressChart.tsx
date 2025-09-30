@@ -185,7 +185,7 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({
               styles.circularPercentage,
               { fontSize: sizes.titleSize }
             ]}>
-              {percentage.toFixed(0)}%
+              {(percentage || 0).toFixed(0)}%
             </ThemedText>
           )}
         </View>
@@ -208,7 +208,7 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({
               styles.percentage,
               { fontSize: sizes.titleSize }
             ]}>
-              {percentage.toFixed(0)}%
+              {(percentage || 0).toFixed(0)}%
             </ThemedText>
           )}
         </View>

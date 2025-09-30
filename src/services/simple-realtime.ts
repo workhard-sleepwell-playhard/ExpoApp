@@ -1,4 +1,4 @@
-import { ref, onValue, push, set, get, query, orderByKey, limitToLast, startAt, endAt } from 'firebase/database';
+import { ref, onValue, push, set, get, query, orderByKey, limitToLast, startAt, endAt, runTransaction } from 'firebase/database';
 import { realtimeDb } from '../utils/firebase/config';
 
 /**
@@ -56,6 +56,10 @@ export class SimpleRealtimeService {
     
     await set(newPostRef, {
       ...postData,
+      likes: 0,
+      dislikes: 0,
+      comments: 0,
+      shares: 0,
       createdAt: Date.now(),
       updatedAt: Date.now()
     });
@@ -77,23 +81,202 @@ export class SimpleRealtimeService {
   }
 
   /**
-   * Like a post
-   * @param postId Post ID to like
-   * @param userId User ID who is liking
+   * Toggle like on a post
+   * @param postId Post ID to like/unlike
+   * @param userId User ID who is liking/unliking
    */
   static async likePost(postId: string, userId: string): Promise<void> {
-    const likeRef = ref(realtimeDb, `posts/${postId}/likes/${userId}`);
-    await set(likeRef, true);
+    try {
+      const likeKey = `${postId}_${userId}`;
+      const likeRef = ref(realtimeDb, `postLikes/${likeKey}`);
+      const dislikeKey = `${postId}_${userId}`;
+      const dislikeRef = ref(realtimeDb, `postDislikes/${dislikeKey}`);
+      const postRef = ref(realtimeDb, `posts/${postId}`);
+      
+      const likeSnapshot = await get(likeRef);
+      const postSnapshot = await get(postRef);
+      
+      if (!postSnapshot.exists()) {
+        throw new Error('Post not found');
+      }
+      
+      const postData = postSnapshot.val();
+      const currentLikes = typeof postData.likes === 'number' ? postData.likes : 0;
+      const currentDislikes = typeof postData.dislikes === 'number' ? postData.dislikes : 0;
+      
+      if (likeSnapshot.exists()) {
+        // Remove like
+        await set(likeRef, null);
+        await set(postRef, {
+          ...postData,
+          likes: Math.max(currentLikes - 1, 0),
+          updatedAt: Date.now()
+        });
+      } else {
+        // Add like and remove dislike if exists
+        await set(likeRef, { postId, userId, likedAt: Date.now() });
+        await set(dislikeRef, null); // Simple one-liner: if dislike exists, remove it
+        await set(postRef, {
+          ...postData,
+          likes: currentLikes + 1,
+          dislikes: Math.max(currentDislikes - 1, 0),
+          updatedAt: Date.now()
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling like on post:', error);
+      throw new Error('Failed to toggle like on post');
+    }
+  }
+
+
+  /**
+   * Toggle dislike on a post
+   * @param postId Post ID to dislike/undislike
+   * @param userId User ID who is disliking/undisliking
+   */
+  static async dislikePost(postId: string, userId: string): Promise<void> {
+    try {
+      const dislikeKey = `${postId}_${userId}`;
+      const dislikeRef = ref(realtimeDb, `postDislikes/${dislikeKey}`);
+      const likeKey = `${postId}_${userId}`;
+      const likeRef = ref(realtimeDb, `postLikes/${likeKey}`);
+      const postRef = ref(realtimeDb, `posts/${postId}`);
+      
+      const dislikeSnapshot = await get(dislikeRef);
+      const postSnapshot = await get(postRef);
+      
+      if (!postSnapshot.exists()) {
+        throw new Error('Post not found');
+      }
+      
+      const postData = postSnapshot.val();
+      const currentLikes = typeof postData.likes === 'number' ? postData.likes : 0;
+      const currentDislikes = typeof postData.dislikes === 'number' ? postData.dislikes : 0;
+      
+      if (dislikeSnapshot.exists()) {
+        // Remove dislike
+        await set(dislikeRef, null);
+        await set(postRef, {
+          ...postData,
+          dislikes: Math.max(currentDislikes - 1, 0),
+          updatedAt: Date.now()
+        });
+      } else {
+        // Add dislike and remove like if exists
+        await set(dislikeRef, { postId, userId, dislikedAt: Date.now() });
+        await set(likeRef, null); // Simple one-liner: if like exists, remove it
+        await set(postRef, {
+          ...postData,
+          dislikes: currentDislikes + 1,
+          likes: Math.max(currentLikes - 1, 0),
+          updatedAt: Date.now()
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling dislike on post:', error);
+      throw new Error('Failed to toggle dislike on post');
+    }
+  }
+
+
+  /**
+   * Check if a user has liked a post
+   * @param postId Post ID to check
+   * @param userId User ID to check
+   * @returns Promise with boolean indicating if user liked the post
+   */
+  static async hasUserLikedPost(postId: string, userId: string): Promise<boolean> {
+    try {
+      const likeKey = `${postId}_${userId}`;
+      const likeRef = ref(realtimeDb, `postLikes/${likeKey}`);
+      const snapshot = await get(likeRef);
+      return snapshot.exists();
+    } catch (error) {
+      console.error('Error checking if user liked post:', error);
+      return false;
+    }
   }
 
   /**
-   * Unlike a post
-   * @param postId Post ID to unlike
-   * @param userId User ID who is unliking
+   * Check if a user has disliked a post
+   * @param postId Post ID to check
+   * @param userId User ID to check
+   * @returns Promise with boolean indicating if user disliked the post
    */
-  static async unlikePost(postId: string, userId: string): Promise<void> {
-    const likeRef = ref(realtimeDb, `posts/${postId}/likes/${userId}`);
-    await set(likeRef, null);
+  static async hasUserDislikedPost(postId: string, userId: string): Promise<boolean> {
+    try {
+      const dislikeKey = `${postId}_${userId}`;
+      const dislikeRef = ref(realtimeDb, `postDislikes/${dislikeKey}`);
+      const snapshot = await get(dislikeRef);
+      return snapshot.exists();
+    } catch (error) {
+      console.error('Error checking if user disliked post:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get all likes for a specific post
+   * @param postId Post ID to get likes for
+   * @returns Promise with array of like records
+   */
+  static async getPostLikes(postId: string): Promise<any[]> {
+    try {
+      const postLikesRef = ref(realtimeDb, 'postLikes');
+      const snapshot = await get(postLikesRef);
+      const allLikes = snapshot.val() || {};
+      
+      // Filter likes for this specific post
+      return Object.entries(allLikes)
+        .filter(([key, likeData]: [string, any]) => likeData.postId === postId)
+        .map(([key, likeData]) => likeData);
+    } catch (error) {
+      console.error('Error getting post likes:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get all dislikes for a specific post
+   * @param postId Post ID to get dislikes for
+   * @returns Promise with array of dislike records
+   */
+  static async getPostDislikes(postId: string): Promise<any[]> {
+    try {
+      const postDislikesRef = ref(realtimeDb, 'postDislikes');
+      const snapshot = await get(postDislikesRef);
+      const allDislikes = snapshot.val() || {};
+      
+      // Filter dislikes for this specific post
+      return Object.entries(allDislikes)
+        .filter(([key, dislikeData]: [string, any]) => dislikeData.postId === postId)
+        .map(([key, dislikeData]) => dislikeData);
+    } catch (error) {
+      console.error('Error getting post dislikes:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get user's interaction with a post (like, dislike, or none)
+   * @param postId Post ID to check
+   * @param userId User ID to check
+   * @returns Promise with interaction type: 'like', 'dislike', or 'none'
+   */
+  static async getUserPostInteraction(postId: string, userId: string): Promise<'like' | 'dislike' | 'none'> {
+    try {
+      const hasLiked = await this.hasUserLikedPost(postId, userId);
+      if (hasLiked) return 'like';
+      
+      const hasDisliked = await this.hasUserDislikedPost(postId, userId);
+      if (hasDisliked) return 'dislike';
+      
+      return 'none';
+    } catch (error) {
+      console.error('Error getting user post interaction:', error);
+      return 'none';
+    }
   }
 
   /**
@@ -101,8 +284,40 @@ export class SimpleRealtimeService {
    * @param postId Post ID to delete
    */
   static async deletePost(postId: string): Promise<void> {
+    try {
+      // Delete the post
     const postRef = ref(realtimeDb, `posts/${postId}`);
     await set(postRef, null);
+      
+      // Delete all likes for this post
+      const postLikesRef = ref(realtimeDb, 'postLikes');
+      const likesSnapshot = await get(postLikesRef);
+      const allLikes = likesSnapshot.val() || {};
+      
+      const deleteLikesPromises = Object.entries(allLikes)
+        .filter(([key, likeData]: [string, any]) => likeData.postId === postId)
+        .map(([key, likeData]) => {
+          const likeRef = ref(realtimeDb, `postLikes/${key}`);
+          return set(likeRef, null);
+        });
+      
+      // Delete all dislikes for this post
+      const postDislikesRef = ref(realtimeDb, 'postDislikes');
+      const dislikesSnapshot = await get(postDislikesRef);
+      const allDislikes = dislikesSnapshot.val() || {};
+      
+      const deleteDislikesPromises = Object.entries(allDislikes)
+        .filter(([key, dislikeData]: [string, any]) => dislikeData.postId === postId)
+        .map(([key, dislikeData]) => {
+          const dislikeRef = ref(realtimeDb, `postDislikes/${key}`);
+          return set(dislikeRef, null);
+        });
+      
+      await Promise.all([...deleteLikesPromises, ...deleteDislikesPromises]);
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      throw new Error('Failed to delete post');
+    }
   }
 
   /**
@@ -423,16 +638,28 @@ export class SimpleRealtimeService {
    */
   static async updateUserPoints(userId: string, pointsData: any): Promise<void> {
     try {
+      
+      if (!userId || userId.trim() === '') {
+        console.error('Invalid userId in updateUserPoints:', userId);
+        throw new Error('Invalid userId provided');
+      }
+      
       const userRef = ref(realtimeDb, `users/${userId}`);
       const snapshot = await get(userRef);
       const currentData = snapshot.exists() ? snapshot.val() : {};
       
-      await set(userRef, {
+      
+      const updatedData = {
         ...currentData,
         ...pointsData,
         updatedAt: Date.now(),
         lastActivityAt: Date.now()
-      });
+      };
+      
+      // Update current user data
+      await set(userRef, updatedData);
+      
+      // Note: Daily snapshot will be created automatically by the real-time listener
     } catch (error) {
       console.error('Error updating user points:', error);
       throw new Error('Failed to update user points');
@@ -557,14 +784,17 @@ export class SimpleRealtimeService {
       
       const newTotalPoints = (currentData.totalPoints || 0) + (activityData.points || 0);
       
-      // Points updated successfully
-      
-      await set(userRef, {
+      const updatedData = {
         ...currentData,
         totalPoints: newTotalPoints,
         lastActivityAt: Date.now(),
         updatedAt: Date.now()
-      });
+      };
+      
+      // Update current user data
+      await set(userRef, updatedData);
+      
+      // Note: Daily snapshot will be created automatically by the real-time listener
     } catch (error) {
       console.error('Error adding points activity:', error);
       throw new Error('Failed to add points activity');
@@ -631,7 +861,10 @@ export class SimpleRealtimeService {
       updates.totalTasks = (currentData.totalTasks || 0);
       updates.pendingTasks = updates.totalTasks - updates.completedTasks;
       
+      // Update current user data
       await set(userRef, updates);
+      
+      // Note: Daily snapshot will be created automatically by the real-time listener
     } catch (error) {
       console.error('Error updating task completion stats:', error);
       throw new Error('Failed to update task completion stats');
@@ -643,7 +876,7 @@ export class SimpleRealtimeService {
    * @param userId User ID to update stats for
    * @param activityType Type of social activity
    */
-  static async updateSocialStats(userId: string, activityType: 'post' | 'like' | 'comment' | 'share'): Promise<void> {
+  static async updateSocialStats(userId: string, activityType: 'post' | 'like' | 'dislike' | 'comment' | 'share'): Promise<void> {
     try {
       const userRef = ref(realtimeDb, `users/${userId}`);
       const snapshot = await get(userRef);
@@ -662,6 +895,9 @@ export class SimpleRealtimeService {
         case 'like':
           updates.postsLiked = (currentData.postsLiked || 0) + 1;
           break;
+        case 'dislike':
+          updates.postsDisliked = (currentData.postsDisliked || 0) + 1;
+          break;
         case 'comment':
           updates.commentsMade = (currentData.commentsMade || 0) + 1;
           break;
@@ -672,7 +908,10 @@ export class SimpleRealtimeService {
 
       updates.socialEngagement = (currentData.socialEngagement || 0) + 1;
       
+      // Update current user data
       await set(userRef, updates);
+      
+      // Note: Daily snapshot will be created automatically by the real-time listener
     } catch (error) {
       console.error('Error updating social stats:', error);
       throw new Error('Failed to update social stats');
@@ -829,11 +1068,16 @@ export class SimpleRealtimeService {
       const snapshot = await get(userRef);
       const currentData = snapshot.exists() ? snapshot.val() : {};
       
-      await set(userRef, {
+      const updatedData = {
         ...currentData,
         ...profileData,
         updatedAt: Date.now()
-      });
+      };
+      
+      // Update current user data
+      await set(userRef, updatedData);
+      
+      // Note: Daily snapshot will be created automatically by the real-time listener
     } catch (error) {
       console.error('Error updating user profile:', error);
       throw new Error('Failed to update user profile');
@@ -852,6 +1096,12 @@ export class SimpleRealtimeService {
     const unsubscribe = onValue(userRef, (snapshot) => {
       try {
         const data = snapshot.val();
+        
+        // Automatically create/update daily snapshot when user data changes
+        if (data && Object.keys(data).length > 0) {
+          this.createDailyUserSnapshot(userId, data);
+        }
+        
         callback(data || {});
       } catch (error) {
         console.error('Error processing user profile data:', error);
@@ -1154,634 +1404,20 @@ export class SimpleRealtimeService {
     return unsubscribe;
   }
 
-  /**
-   * Create daily analytics data
-   * @param analyticsData Analytics data to create
-   * @returns Promise with analytics ID
-   */
-  static async createDailyAnalytics(analyticsData: any): Promise<string> {
-    try {
-      const { userId, date } = analyticsData;
-      const analyticsRef = ref(realtimeDb, `dailyAnalytics/${userId}/${date}`);
-      
-      // Validate and ensure sourceData structure
-      const validatedData = {
-        ...analyticsData,
-        sourceData: analyticsData.sourceData || {
-          tasks: [],
-          sessions: []
-        },
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      };
-      
-      // Validate sourceData structure
-      if (validatedData.sourceData.tasks && !Array.isArray(validatedData.sourceData.tasks)) {
-        validatedData.sourceData.tasks = [];
-      }
-      if (validatedData.sourceData.sessions && !Array.isArray(validatedData.sourceData.sessions)) {
-        validatedData.sourceData.sessions = [];
-      }
-      
-      await set(analyticsRef, validatedData);
-      
-      return `${userId}/${date}`;
-    } catch (error) {
-      console.error('Error creating daily analytics:', error);
-      throw new Error('Failed to create daily analytics');
-    }
-  }
 
-  /**
-   * Create daily analytics with source tracking from actual sessions and tasks
-   * @param userId User ID
-   * @param date Date (YYYY-MM-DD format)
-   * @param sessions Array of time tracking sessions for the day
-   * @param tasks Array of completed tasks for the day
-   * @returns Promise with analytics ID
-   */
-  static async createDailyAnalyticsWithSourceTracking(
-    userId: string, 
-    date: string, 
-    sessions: any[] = [], 
-    tasks: any[] = []
-  ): Promise<string> {
-    try {
-      // Calculate totals from source data
-      const totalHoursTracked = sessions.reduce((sum, session) => sum + (session.duration || 0), 0) / 60; // Convert minutes to hours
-      const totalSessions = sessions.length;
-      const tasksCompleted = tasks.length;
-      
-      // Generate categories from sessions
-      const categoryMap = new Map();
-      sessions.forEach(session => {
-        const category = session.category || 'Other';
-        if (!categoryMap.has(category)) {
-          categoryMap.set(category, { hours: 0, sessions: 0 });
-        }
-        const categoryData = categoryMap.get(category);
-        categoryData.hours += (session.duration || 0) / 60; // Convert to hours
-        categoryData.sessions += 1;
-      });
-      
-      const categories = Array.from(categoryMap.entries()).map(([name, data]) => ({
-        name,
-        hours: Math.round(data.hours * 100) / 100, // 2 decimal places
-        sessions: data.sessions
-      }));
-      
-      // Calculate points from tasks
-      const pointsEarned = tasks.reduce((sum, task) => sum + (task.points || 0), 0);
-      
-      // Create source data arrays
-      const sourceTasks = tasks.map(task => ({
-        taskId: task.id || task.taskId || `task_${Date.now()}_${Math.random()}`,
-        taskName: task.name || task.taskName || 'Unnamed Task',
-        completedAt: task.completedAt || task.completedAt || new Date().toISOString(),
-        points: task.points || 0,
-        category: task.category || 'Other',
-        priority: task.priority || 'medium'
-      }));
-      
-      const sourceSessions = sessions.map(session => ({
-        sessionId: session.id || session.sessionId || `session_${Date.now()}_${Math.random()}`,
-        duration: session.duration || 0,
-        category: session.category || 'Other',
-        startTime: session.startTime || session.startTime || new Date().toISOString(),
-        endTime: session.endTime || session.endTime || new Date().toISOString(),
-        description: session.description || session.description || 'Time tracking session'
-      }));
-      
-      const analyticsData = {
-        userId,
-        date,
-        totalHoursTracked: Math.round(totalHoursTracked * 100) / 100, // 2 decimal places
-        totalSessions,
-        categories,
-        tasksCompleted,
-        tasksPending: 0, // Would need to be calculated from task management system
-        tasksOverdue: 0, // Would need to be calculated from task management system
-        pointsEarned,
-        productivityScore: Math.min(100, Math.floor((totalHoursTracked * 10 + tasksCompleted * 5) / 2)), // Simple calculation
-        sourceData: {
-          tasks: sourceTasks,
-          sessions: sourceSessions
-        }
-      };
-      
-      return await this.createDailyAnalytics(analyticsData);
-    } catch (error) {
-      console.error('Error creating daily analytics with source tracking:', error);
-      throw new Error('Failed to create daily analytics with source tracking');
-    }
-  }
 
-  /**
-   * Get source tracking data for a specific day
-   * @param userId User ID
-   * @param date Date (YYYY-MM-DD format)
-   * @returns Promise with source tracking data
-   */
-  static async getSourceTrackingData(userId: string, date: string): Promise<any | null> {
-    try {
-      const analytics = await this.getDailyAnalytics(userId, date);
-      if (!analytics) return null;
-      
-      return {
-        date: analytics.date,
-        totalTasks: analytics.sourceData?.tasks?.length || 0,
-        totalSessions: analytics.sourceData?.sessions?.length || 0,
-        tasks: analytics.sourceData?.tasks || [],
-        sessions: analytics.sourceData?.sessions || [],
-        summary: {
-          totalHours: analytics.totalHoursTracked,
-          totalPoints: analytics.pointsEarned,
-          productivityScore: analytics.productivityScore
-        }
-      };
-    } catch (error) {
-      console.error('Error getting source tracking data:', error);
-      throw new Error('Failed to get source tracking data');
-    }
-  }
 
-  /**
-   * Process analytics data for charts (used by custom date range)
-   * @param analyticsData - Array of analytics data
-   * @returns Processed data for all chart types
-   */
-  static processAnalyticsForCharts(analyticsData: any[]): any {
-    // For custom date range, we only have analytics data, no sessions
-    // So we'll generate empty sessions array and use analytics for other data
-    const emptySessions: any[] = [];
-    
-    return {
-      weeklyProgress: this.generateWeeklyProgressData(emptySessions),
-      taskCompletionData: this.generateTaskCompletionData(analyticsData),
-      dailyPointsData: this.generateDailyPointsData(analyticsData),
-      categories: SimpleRealtimeService.generateCategoriesFromAnalytics(analyticsData)
-    };
-  }
 
-  /**
-   * Generate categories data from analytics (for custom date range)
-   * @param analytics - Analytics data
-   * @returns Categories data for summary
-   */
-  private static generateCategoriesFromAnalytics(analytics: any[]): any[] {
-    const categoryMap = new Map();
-    
-    analytics.forEach(day => {
-      if (day.sourceData?.tasks && day.sourceData.tasks.length > 0) {
-        // Use detailed source data if available
-        day.sourceData.tasks.forEach((task: any) => {
-          const category = task.categoryName || 'Work';
-          const hours = Math.round((task.duration || 0) * 100) / 100; // Store 2 decimal places
-          
-          if (categoryMap.has(category)) {
-            const existing = categoryMap.get(category);
-            existing.hours += hours;
-            existing.sessions += 1;
-          } else {
-            categoryMap.set(category, {
-              name: category,
-              hours: hours,
-              sessions: 1,
-              color: this.getCategoryColor(category),
-              icon: this.getCategoryIcon(category)
-            });
-          }
-        });
-      }
-    });
-    
-    return Array.from(categoryMap.values()).sort((a, b) => b.hours - a.hours);
-  }
 
-  /**
-   * Get recent daily analytics with limit (for dashboard summaries)
-   * @param userId User ID
-   * @param limit Number of recent days to fetch (default: 7)
-   * @returns Promise with recent analytics data
-   */
-  static async getRecentDailyAnalytics(userId: string, limit: number = 7): Promise<any[]> {
-    try {
-      const analyticsRef = ref(realtimeDb, `dailyAnalytics/${userId}`);
-      const queryRef = query(analyticsRef, orderByKey(), limitToLast(limit));
-      
-      const snapshot = await get(queryRef);
-      const data = snapshot.val();
-      
-      if (!data) return [];
-      
-      return Object.keys(data)
-        .map(date => ({
-          id: `${userId}/${date}`,
-          analyticsId: `${userId}/${date}`,
-          userId,
-          date,
-          ...data[date]
-        }))
-        .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    } catch (error) {
-      console.error('Error getting recent daily analytics:', error);
-      throw new Error('Failed to get recent daily analytics');
-    }
-  }
 
-  /**
-   * Get daily analytics within a date range
-   * @param userId User ID
-   * @param startDate Start date (YYYY-MM-DD format)
-   * @param endDate End date (YYYY-MM-DD format)
-   * @returns Promise with analytics data in range
-   */
-  static async getDailyAnalyticsInRange(
-    userId: string, 
-    startDate: string, 
-    endDate: string
-  ): Promise<any[]> {
-    try {
-      const analyticsRef = ref(realtimeDb, `dailyAnalytics/${userId}`);
-      const queryRef = query(
-        analyticsRef, 
-        orderByKey(), 
-        startAt(startDate), 
-        endAt(endDate)
-      );
-      
-      const snapshot = await get(queryRef);
-      const data = snapshot.val();
-      
-      if (!data) return [];
-      
-      return Object.keys(data)
-        .map(date => ({
-          id: `${userId}/${date}`,
-          analyticsId: `${userId}/${date}`,
-          userId,
-          date,
-          ...data[date]
-        }))
-        .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    } catch (error) {
-      console.error('Error getting daily analytics in range:', error);
-      throw new Error('Failed to get daily analytics in range');
-    }
-  }
 
-  /**
-   * Get weekly analytics summary (last 4 weeks)
-   * @param userId User ID
-   * @param weeks Number of weeks to fetch (default: 4)
-   * @returns Promise with weekly analytics data
-   */
-  static async getWeeklyAnalyticsSummary(userId: string, weeks: number = 4): Promise<any[]> {
-    try {
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - (weeks * 7));
-      
-      const startDateStr = startDate.toISOString().split('T')[0];
-      const endDateStr = endDate.toISOString().split('T')[0];
-      
-      return await this.getDailyAnalyticsInRange(userId, startDateStr, endDateStr);
-    } catch (error) {
-      console.error('Error getting weekly analytics summary:', error);
-      throw new Error('Failed to get weekly analytics summary');
-    }
-  }
 
-  /**
-   * Get monthly analytics summary (last 3 months)
-   * @param userId User ID
-   * @param months Number of months to fetch (default: 3)
-   * @returns Promise with monthly analytics data
-   */
-  static async getMonthlyAnalyticsSummary(userId: string, months: number = 3): Promise<any[]> {
-    try {
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setMonth(startDate.getMonth() - months);
-      
-      const startDateStr = startDate.toISOString().split('T')[0];
-      const endDateStr = endDate.toISOString().split('T')[0];
-      
-      return await this.getDailyAnalyticsInRange(userId, startDateStr, endDateStr);
-    } catch (error) {
-      console.error('Error getting monthly analytics summary:', error);
-      throw new Error('Failed to get monthly analytics summary');
-    }
-  }
 
-  /**
-   * Get daily analytics for a user
-   * @param userId User ID to get analytics for
-   * @param date Date to get analytics for (YYYY-MM-DD format)
-   * @returns Promise with analytics data
-   */
-  static async getDailyAnalytics(userId: string, date: string): Promise<any | null> {
-    try {
-      const analyticsRef = ref(realtimeDb, `dailyAnalytics/${userId}/${date}`);
-      const snapshot = await get(analyticsRef);
-      const data = snapshot.val();
-      
-      if (!data) return null;
-      
-      return {
-        id: `${userId}/${date}`,
-        analyticsId: `${userId}/${date}`,
-        ...data
-      };
-    } catch (error) {
-      console.error('Error getting daily analytics:', error);
-      throw new Error('Failed to get daily analytics');
-    }
-  }
 
-  /**
-   * Listen to recent daily analytics with limit (optimized for dashboard)
-   * @param userId User ID
-   * @param limit Number of recent days to listen to (default: 7)
-   * @param callback Function to call when analytics are updated
-   * @returns Unsubscribe function
-   */
-  static listenToRecentDailyAnalytics(
-    userId: string, 
-    limit: number = 7, 
-    callback: (analytics: any[]) => void
-  ): () => void {
-    const analyticsRef = ref(realtimeDb, `dailyAnalytics/${userId}`);
-    const queryRef = query(analyticsRef, orderByKey(), limitToLast(limit));
-    
-    const unsubscribe = onValue(queryRef, (snapshot) => {
-      try {
-        const data = snapshot.val();
-        
-        if (!data) {
-          callback([]);
-          return;
-        }
-        
-        const analytics = Object.keys(data)
-          .map(date => ({ 
-            id: `${userId}/${date}`, 
-            analyticsId: `${userId}/${date}`, 
-            userId,
-            date,
-            ...data[date] 
-          }))
-          .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-        
-        callback(analytics);
-      } catch (error) {
-        console.error('Error processing recent daily analytics data:', error);
-        callback([]);
-      }
-    }, (error) => {
-      this.handleConnectionError(error, 'listenToRecentDailyAnalytics');
-      callback([]);
-    });
-    
-    return unsubscribe;
-  }
 
-  /**
-   * Listen to daily analytics within a date range (optimized for charts)
-   * @param userId User ID
-   * @param startDate Start date (YYYY-MM-DD format)
-   * @param endDate End date (YYYY-MM-DD format)
-   * @param callback Function to call when analytics are updated
-   * @returns Unsubscribe function
-   */
-  static listenToDailyAnalyticsInRange(
-    userId: string,
-    startDate: string,
-    endDate: string,
-    callback: (analytics: any[]) => void
-  ): () => void {
-    const analyticsRef = ref(realtimeDb, `dailyAnalytics/${userId}`);
-    const queryRef = query(
-      analyticsRef, 
-      orderByKey(), 
-      startAt(startDate), 
-      endAt(endDate)
-    );
-    
-    const unsubscribe = onValue(queryRef, (snapshot) => {
-      try {
-        const data = snapshot.val();
-        
-        if (!data) {
-          callback([]);
-          return;
-        }
-        
-        const analytics = Object.keys(data)
-          .map(date => ({ 
-            id: `${userId}/${date}`, 
-            analyticsId: `${userId}/${date}`, 
-            userId,
-            date,
-            ...data[date] 
-          }))
-          .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-        
-        callback(analytics);
-      } catch (error) {
-        console.error('Error processing daily analytics range data:', error);
-        callback([]);
-      }
-    }, (error) => {
-      this.handleConnectionError(error, 'listenToDailyAnalyticsInRange');
-      callback([]);
-    });
-    
-    return unsubscribe;
-  }
 
-  /**
-   * Listen to daily analytics for a user in real-time
-   * @param userId User ID to listen to analytics for
-   * @param callback Function to call when analytics are updated
-   * @returns Unsubscribe function
-   */
-  static listenToDailyAnalytics(userId: string, callback: (analytics: any[]) => void): () => void {
-    const analyticsRef = ref(realtimeDb, `dailyAnalytics/${userId}`);
-    
-    const unsubscribe = onValue(analyticsRef, (snapshot) => {
-      try {
-        const data = snapshot.val();
-        
-        if (!data) {
-          callback([]);
-          return;
-        }
-        
-        // Convert the nested structure to array and sort by date
-        const analytics = Object.keys(data)
-          .map(date => ({ 
-            id: `${userId}/${date}`, 
-            analyticsId: `${userId}/${date}`, 
-            userId,
-            date,
-            ...data[date] 
-          }))
-          .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-        
-        callback(analytics);
-      } catch (error) {
-        console.error('Error processing daily analytics data:', error);
-        callback([]);
-      }
-    }, (error) => {
-      this.handleConnectionError(error, 'listenToDailyAnalytics');
-      callback([]);
-    });
-    
-    return unsubscribe;
-  }
 
-  /**
-   * Listen to optimized tracking data with query strategies
-   * @param userId User ID to listen to tracking data for
-   * @param options Query options for optimization
-   * @param callback Function to call when tracking data is updated
-   * @returns Unsubscribe function
-   */
-  static listenToOptimizedTrackingData(
-    userId: string, 
-    options: {
-      recentDays?: number; // For recent analytics (default: 7)
-      dateRange?: { startDate: string; endDate: string }; // For specific range
-      sessionLimit?: number; // For recent sessions (default: 50)
-    } = {},
-    callback: (trackingData: any) => void
-  ): () => void {
-    const { recentDays = 7, dateRange, sessionLimit = 50 } = options;
-    
-    // Listen to sessions with limit for performance
-    const sessionsRef = ref(realtimeDb, 'timeTrackingSessions');
-    const sessionsQueryRef = query(sessionsRef, orderByKey(), limitToLast(sessionLimit));
-    
-    let sessionsData: any[] = [];
-    let analyticsData: any[] = [];
-    
-    const processData = () => {
-      // Filter sessions by userId
-      const userSessions = sessionsData.filter((session: any) => session.userId === userId);
-      
-      // Generate chart data from the raw data
-      const trackingData = {
-        sessions: userSessions,
-        analytics: analyticsData,
-        weeklyProgress: this.generateWeeklyProgressData(userSessions),
-        taskCompletionData: this.generateTaskCompletionData(analyticsData),
-        dailyPointsData: this.generateDailyPointsData(analyticsData),
-        categoriesData: this.generateCategoriesData(userSessions)
-      };
-      
-      callback(trackingData);
-    };
-    
-    // Listen to sessions with limit
-    const unsubscribeSessions = onValue(sessionsQueryRef, (snapshot) => {
-      const data = snapshot.val();
-      sessionsData = data ? Object.values(data) : [];
-      processData();
-    });
-    
-    // Listen to analytics with appropriate query strategy
-    let unsubscribeAnalytics: () => void;
-    
-    if (dateRange) {
-      // Use range query for specific date range
-      unsubscribeAnalytics = this.listenToDailyAnalyticsInRange(
-        userId,
-        dateRange.startDate,
-        dateRange.endDate,
-        (analytics) => {
-          analyticsData = analytics;
-          processData();
-        }
-      );
-    } else {
-      // Use recent analytics query for dashboard
-      unsubscribeAnalytics = this.listenToRecentDailyAnalytics(
-        userId,
-        recentDays,
-        (analytics) => {
-          analyticsData = analytics;
-          processData();
-        }
-      );
-    }
-    
-    return () => {
-      unsubscribeSessions();
-      unsubscribeAnalytics();
-    };
-  }
 
-  /**
-   * Listen to tracking data (sessions + analytics) for a user
-   * @param userId User ID to listen to tracking data for
-   * @param callback Function to call when tracking data is updated
-   * @returns Unsubscribe function
-   */
-  static listenToTrackingData(userId: string, callback: (trackingData: any) => void): () => void {
-    // Listen to both sessions and analytics data
-    const sessionsRef = ref(realtimeDb, 'timeTrackingSessions');
-    const analyticsRef = ref(realtimeDb, `dailyAnalytics/${userId}`);
-    
-    let sessionsData: any[] = [];
-    let analyticsData: any[] = [];
-    
-    const processData = () => {
-      // Generate chart data from the raw data
-      const trackingData = {
-        sessions: sessionsData,
-        analytics: analyticsData,
-        weeklyProgress: this.generateWeeklyProgressData(sessionsData),
-        taskCompletionData: this.generateTaskCompletionData(analyticsData),
-        dailyPointsData: this.generateDailyPointsData(analyticsData),
-        categoriesData: this.generateCategoriesData(sessionsData)
-      };
-      
-      callback(trackingData);
-    };
-    
-    // Listen to sessions
-    const unsubscribeSessions = onValue(sessionsRef, (snapshot) => {
-      const data = snapshot.val();
-      sessionsData = data ? Object.values(data).filter((session: any) => session.userId === userId) : [];
-      processData();
-    });
-    
-    // Listen to analytics
-    const unsubscribeAnalytics = onValue(analyticsRef, (snapshot) => {
-      const data = snapshot.val();
-      if (!data) {
-        analyticsData = [];
-      } else {
-        // Convert the nested structure to array
-        analyticsData = Object.keys(data).map(date => ({
-          id: `${userId}/${date}`,
-          analyticsId: `${userId}/${date}`,
-          userId,
-          date,
-          ...data[date]
-        }));
-      }
-      processData();
-    });
-    
-    // Return cleanup function
-    return () => {
-      unsubscribeSessions();
-      unsubscribeAnalytics();
-    };
-  }
 
   /**
    * Generate weekly progress data from sessions
@@ -1817,62 +1453,7 @@ export class SimpleRealtimeService {
     return weeklyData;
   }
 
-  /**
-   * Generate task completion data from analytics
-   * @param analytics Array of daily analytics
-   * @returns Task completion data for pie chart
-   */
-  private static generateTaskCompletionData(analytics: any[]): any[] {
-    const totalCompleted = analytics.reduce((sum, day) => sum + (day.tasksCompleted || 0), 0);
-    const totalPending = analytics.reduce((sum, day) => sum + (day.tasksPending || 0), 0);
-    const totalOverdue = analytics.reduce((sum, day) => sum + (day.tasksOverdue || 0), 0);
-    const totalTasks = totalCompleted + totalPending + totalOverdue;
-    
-    if (totalTasks === 0) {
-      return [
-        { id: 1, category: 'Completed', count: 0, color: '#4CAF50', percentage: 0 },
-        { id: 2, category: 'Pending', count: 0, color: '#FF5722', percentage: 0 }
-      ];
-    }
-    
-    return [
-      {
-        id: 1,
-        category: 'Completed',
-        count: totalCompleted,
-        color: '#4CAF50',
-        percentage: Math.round((totalCompleted / totalTasks) * 100)
-      },
-      {
-        id: 2,
-        category: 'Pending',
-        count: totalPending,
-        color: '#FF5722',
-        percentage: Math.round((totalPending / totalTasks) * 100)
-      }
-    ];
-  }
 
-  /**
-   * Generate daily points data from analytics
-   * @param analytics Array of daily analytics
-   * @returns Daily points data for line chart
-   */
-  private static generateDailyPointsData(analytics: any[]): any[] {
-    return analytics
-      .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
-      .map(day => {
-        const hoursTracked = Math.round((day.totalHoursTracked || 0) * 100) / 100; // Store 2 decimal places
-        return {
-          time: day.date || '',
-          points: day.pointsEarned || 0,
-          tasksCompleted: day.tasksCompleted || 0,
-          hoursTracked,
-          productivityScore: day.productivityScore || 0,
-          activity: `${day.tasksCompleted || 0} tasks • ${hoursTracked.toFixed(1)}h` // Display 1 decimal place
-        };
-      });
-  }
 
   /**
    * Filter data by time period
@@ -1917,20 +1498,20 @@ export class SimpleRealtimeService {
     sessions.forEach(session => {
       const category = session.categoryName || 'Work';
       const hours = Math.round(((session.duration || 0) / 60) * 100) / 100; // Store 2 decimal places
-      
-      if (categoryMap.has(category)) {
-        const existing = categoryMap.get(category);
-        existing.hours += hours;
-      } else {
-        categoryMap.set(category, {
+          
+          if (categoryMap.has(category)) {
+            const existing = categoryMap.get(category);
+            existing.hours += hours;
+          } else {
+            categoryMap.set(category, {
           id: category.toLowerCase().replace(/\s+/g, '-'),
           category,
           hours,
-          color: this.getCategoryColor(category),
-          icon: this.getCategoryIcon(category)
+              color: this.getCategoryColor(category),
+              icon: this.getCategoryIcon(category)
+            });
+          }
         });
-      }
-    });
     
     // Round final hours to 2 decimal places for storage
     const result = Array.from(categoryMap.values()).map(cat => ({
@@ -1948,13 +1529,14 @@ export class SimpleRealtimeService {
    */
   private static getCategoryColor(category: string): string {
     const colors: { [key: string]: string } = {
-      'Work': '#2196F3',
-      'Study': '#4CAF50',
-      'Exercise': '#FF9800',
-      'Personal': '#9C27B0',
-      'Other': '#607D8B'
+      'work': '#FF3B30',
+      'personal': '#34C759', 
+      'health': '#FF9500',
+      'learning': '#007AFF',
+      'finance': '#5856D6',
+      'other': '#8E8E93'
     };
-    return colors[category] || '#607D8B';
+    return colors[category] || '#2196F3';
   }
 
   /**
@@ -1964,142 +1546,904 @@ export class SimpleRealtimeService {
    */
   private static getCategoryIcon(category: string): string {
     const icons: { [key: string]: string } = {
-      'Work': 'briefcase',
-      'Study': 'book',
-      'Exercise': 'dumbbell',
-      'Personal': 'user',
-      'Other': 'circle'
+      'work': 'briefcase',
+      'personal': 'house',
+      'health': 'heart',
+      'learning': 'book',
+      'finance': 'dollarsign',
+      'other': 'circle'
     };
     return icons[category] || 'circle';
   }
 
   /**
-   * Create sample tracking data for testing
-   * @param userId User ID
-   * @returns Promise<void>
+   * Start automatic daily snapshot listener for a user
+   * This will automatically create/update snapshots whenever user data changes
+   * @param userId User ID to start listening for
+   * @returns Unsubscribe function
    */
-  static async createSampleTrackingData(userId: string): Promise<void> {
-    try {
-      const categories = ['Work', 'Study', 'Exercise', 'Personal'];
-      const now = new Date();
+  static startAutomaticSnapshotListener(userId: string): () => void {
+    const userRef = ref(realtimeDb, `users/${userId}`);
+    
+    const unsubscribe = onValue(userRef, (snapshot) => {
+      try {
+      const data = snapshot.val();
       
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(now);
-        date.setDate(date.getDate() - i);
-        
-        const sessionCount = Math.floor(Math.random() * 3) + 1;
-        
-        for (let j = 0; j < sessionCount; j++) {
-          const category = categories[Math.floor(Math.random() * categories.length)];
-          const duration = Math.floor(Math.random() * 180) + 30;
-          const startTime = new Date(date);
-          startTime.setHours(9 + j * 3, Math.floor(Math.random() * 60), 0, 0);
-          
-          await this.createTimeTrackingSession({
-            userId,
-            categoryId: category.toLowerCase(),
-            categoryName: category,
-            categoryColor: this.getCategoryColor(category),
-            categoryIcon: this.getCategoryIcon(category),
-            startTime: startTime.getTime(),
-            endTime: startTime.getTime() + (duration * 60000),
-            duration,
-            description: `Sample ${category} session`,
-            tags: [category.toLowerCase()],
-            productivityRating: Math.floor(Math.random() * 5) + 1,
-            breakTaken: Math.random() > 0.7,
-            breakDuration: Math.floor(Math.random() * 30)
-          });
+        // Automatically create/update daily snapshot when user data changes
+        if (data && Object.keys(data).length > 0) {
+          this.createDailyUserSnapshot(userId, data);
         }
-        
-        const totalHours = Math.round((Math.random() * 8 + 1) * 100) / 100; // 2 decimal places
-        const tasksCompleted = Math.floor(Math.random() * 10) + 1;
-        
-        // Generate source data for tasks and sessions
-        const sourceTasks = [];
-        const sourceSessions = [];
-        
-        // Generate completed tasks with source tracking
-        for (let i = 0; i < tasksCompleted; i++) {
-          const taskId = `task_${userId}_${date.toISOString().split('T')[0]}_${i}`;
-          const completedAt = new Date(date);
-          completedAt.setHours(9 + Math.floor(Math.random() * 8)); // Random hour between 9-17
-          completedAt.setMinutes(Math.floor(Math.random() * 60));
-          
-          sourceTasks.push({
-            taskId,
-            taskName: `Sample Task ${i + 1}`,
-            completedAt: completedAt.toISOString(),
-            points: Math.floor(Math.random() * 20) + 5, // 5-25 points
-            category: categories[Math.floor(Math.random() * categories.length)],
-            priority: ['low', 'medium', 'high', 'urgent'][Math.floor(Math.random() * 4)]
-          });
-        }
-        
-        // Generate sessions with source tracking
-        let remainingHours = totalHours;
-        for (let i = 0; i < sessionCount; i++) {
-          const sessionId = `session_${userId}_${date.toISOString().split('T')[0]}_${i}`;
-          const sessionDuration = Math.min(
-            Math.round((Math.random() * remainingHours + 0.5) * 100) / 100, // 0.5-remaining hours
-            remainingHours
-          );
-          remainingHours = Math.max(0, remainingHours - sessionDuration);
-          
-          const startTime = new Date(date);
-          startTime.setHours(8 + Math.floor(Math.random() * 10)); // Random hour between 8-18
-          startTime.setMinutes(Math.floor(Math.random() * 60));
-          
-          const endTime = new Date(startTime);
-          endTime.setMinutes(endTime.getMinutes() + Math.round(sessionDuration * 60));
-          
-          sourceSessions.push({
-            sessionId,
-            duration: Math.round(sessionDuration * 60), // Convert to minutes
-            category: categories[Math.floor(Math.random() * categories.length)],
-            startTime: startTime.toISOString(),
-            endTime: endTime.toISOString(),
-            description: `Work session ${i + 1}`
-          });
-        }
+    } catch (error) {
+        console.error('Error in automatic snapshot listener:', error);
+      }
+    }, (error: any) => {
+      console.error('Error in automatic snapshot listener:', error);
+    });
+    
+    return unsubscribe;
+  }
 
-        const analyticsId = await this.createDailyAnalytics({
-          userId,
-          date: date.toISOString().split('T')[0],
-          totalHoursTracked: totalHours,
-          totalSessions: sessionCount,
-          categories: categories.map(cat => ({
-            name: cat,
-            hours: Math.round((Math.random() * totalHours) * 100) / 100, // 2 decimal places
-            sessions: Math.floor(Math.random() * sessionCount)
-          })),
-          tasksCompleted,
-          tasksPending: Math.floor(Math.random() * 5),
-          tasksOverdue: Math.floor(Math.random() * 3),
-          pointsEarned: Math.floor(totalHours * 10 + tasksCompleted * 5),
-          productivityScore: Math.floor(Math.random() * 40) + 60,
-          // NEW: Detailed source tracking
-          sourceData: {
-            tasks: sourceTasks,
-            sessions: sourceSessions
-          }
-        });
+  /**
+   * Create or update daily user snapshot
+   * @param userId User ID to create/update snapshot for
+   * @param userData Current user data to snapshot
+   */
+  static async createDailyUserSnapshot(userId: string, userData: any): Promise<void> {
+    try {
+      // Validate inputs
+      if (!userId || userId.trim() === '') {
+        return;
+      }
+      
+      if (!userData || typeof userData !== 'object') {
+        return;
+      }
+      
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      const snapshotRef = ref(realtimeDb, `userDailySnapshots/${userId}/${today}`);
+      
+      // Check if snapshot already exists for today
+      const existingSnapshot = await get(snapshotRef);
+      const isUpdate = existingSnapshot.exists();
+      
+      // Get user's tasks for separate task snapshots
+      const userTasks = await this.getUserTasks(userId);
+      
+      // Create/update snapshot without nested tasks
+      const snapshotData = {
+        // Basic user data
+        ...userData,
+        snapshotDate: today,
+        snapshotTimestamp: Date.now(),
+        updatedAt: Date.now(),
+        // Only set createdAt if this is a new snapshot
+        ...(isUpdate ? {} : { createdAt: Date.now() })
+      };
+      
+      await set(snapshotRef, snapshotData);
+      
+      // Create separate task daily snapshots
+      await this.createTaskDailySnapshots(userId, today, userTasks);
+      
+    } catch (error: any) {
+      console.error('Error creating/updating daily user snapshot:', error);
+      // Don't throw error - snapshot creation shouldn't break main functionality
+    }
+  }
+
+  /**
+   * Create task daily snapshots for a user
+   * @param userId User ID
+   * @param date Date string (YYYY-MM-DD)
+   * @param userTasks User's tasks data
+   */
+  static async createTaskDailySnapshots(userId: string, date: string, userTasks: any): Promise<void> {
+    try {
+      const taskSnapshotsRef = ref(realtimeDb, `taskDailySnapshots/${userId}/${date}`);
+      
+      // Get points from pointsActivity for this date
+      const pointsForDate = await this.getPointsForDate(userId, date);
+      
+      // Count completed tasks for this date
+      const completedTasks = Object.values(userTasks).filter((task: any) => task.completed);
+      const completedCount = completedTasks.length;
+      
+      // Calculate points per completed task
+      const pointsPerTask = completedCount > 0 ? Math.floor(pointsForDate / completedCount) : 0;
+      const remainingPoints = pointsForDate - (pointsPerTask * completedCount);
+      
+      // Create snapshot for each task
+      const taskSnapshots: any = {};
+      let taskIndex = 0;
+      
+      Object.entries(userTasks).forEach(([taskId, taskData]: [string, any]) => {
+        let taskPoints = 0;
         
-        // Log source tracking data for verification
-        console.log(`📊 Created analytics for ${date.toISOString().split('T')[0]} with source tracking:`, {
-          analyticsId,
-          tasks: sourceTasks.length,
-          sessions: sourceSessions.length,
-          totalHours: totalHours,
-          sampleTask: sourceTasks[0],
-          sampleSession: sourceSessions[0]
+        // Give points to completed tasks
+        if (taskData.completed) {
+          taskPoints = pointsPerTask;
+          // Give remaining points to the first completed task
+          if (taskIndex === 0 && remainingPoints > 0) {
+            taskPoints += remainingPoints;
+          }
+          taskIndex++;
+        }
+        
+        taskSnapshots[taskId] = {
+          taskId,
+          userId,
+          date,
+          title: taskData.title || 'Untitled Task',
+          category: taskData.category || 'other',
+          priority: taskData.priority || 'medium',
+          completed: taskData.completed || false,
+          points: taskPoints, // Use calculated points from pointsActivity
+          hoursTracked: taskData.hoursTracked || 0,
+          completedAt: taskData.completedAt || null,
+          createdAt: taskData.createdAt,
+          updatedAt: taskData.updatedAt,
+          snapshotTimestamp: Date.now()
+        };
+      });
+
+      await set(taskSnapshotsRef, taskSnapshots);
+    } catch (error) {
+      console.error('Error creating task daily snapshots:', error);
+    }
+  }
+
+  /**
+   * Get points earned for a specific date from pointsActivity
+   * @param userId User ID
+   * @param date Date string (YYYY-MM-DD)
+   * @returns Promise with total points for the date
+   */
+  static async getPointsForDate(userId: string, date: string): Promise<number> {
+    try {
+      const activitiesRef = ref(realtimeDb, 'pointsActivity');
+      const snapshot = await get(activitiesRef);
+      const data = snapshot.val();
+      
+      if (!data) return 0;
+      
+      let totalPoints = 0;
+      const targetDate = new Date(date).toISOString().split('T')[0];
+      
+      Object.values(data).forEach((activity: any) => {
+        if (activity.userId === userId) {
+          const activityDate = new Date(activity.timestamp || activity.createdAt).toISOString().split('T')[0];
+          if (activityDate === targetDate) {
+            totalPoints += activity.points || 0;
+          }
+        }
+      });
+      
+      return totalPoints;
+    } catch (error) {
+      console.error('Error getting points for date:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get user's tasks for snapshot
+   * @param userId User ID to get tasks for
+   * @returns Promise with user's tasks organized by category
+   */
+  static async getUserTasks(userId: string): Promise<any> {
+    try {
+      const tasksRef = ref(realtimeDb, 'tasks');
+      const snapshot = await get(tasksRef);
+      const allTasks = snapshot.val() || {};
+      
+      // Filter tasks for this user
+      const userTasks: any = {};
+      Object.entries(allTasks).forEach(([taskId, taskData]: [string, any]) => {
+        if (taskData.userId === userId) {
+          userTasks[taskId] = {
+            id: taskId,
+            title: taskData.title || 'Untitled Task',
+            category: taskData.category || 'other',
+            priority: taskData.priority || 'medium',
+            completed: taskData.completed || false,
+            points: taskData.points || 0,
+            hoursTracked: taskData.hoursTracked || 0,
+            completedAt: taskData.completedAt || null,
+            createdAt: taskData.createdAt,
+            updatedAt: taskData.updatedAt
+          };
+        }
+      });
+      
+      return userTasks;
+    } catch (error) {
+      console.error('Error getting user tasks:', error);
+      return {};
+    }
+  }
+
+  /**
+   * Get task daily snapshots for a user
+   * @param userId User ID
+   * @param startDate Start date (YYYY-MM-DD)
+   * @param endDate End date (YYYY-MM-DD)
+   * @returns Promise with task snapshots
+   */
+  static async getTaskDailySnapshots(userId: string, startDate?: string, endDate?: string): Promise<any[]> {
+    try {
+      console.log(`📊 Getting task snapshots for user ${userId}, date range: ${startDate} to ${endDate}`);
+      const taskSnapshotsRef = ref(realtimeDb, `taskDailySnapshots/${userId}`);
+      
+      let snapshot;
+      if (startDate && endDate) {
+        const queryRef = query(
+          taskSnapshotsRef,
+          orderByKey(),
+          startAt(startDate),
+          endAt(endDate)
+        );
+        snapshot = await get(queryRef);
+      } else {
+        snapshot = await get(taskSnapshotsRef);
+      }
+      const data = snapshot.val();
+      
+      console.log(`📊 Raw task snapshots data:`, data);
+      
+      if (!data) {
+        console.log('📊 No task snapshots data found');
+        return [];
+      }
+
+      const snapshots: any[] = [];
+      Object.entries(data).forEach(([date, dayData]: [string, any]) => {
+        console.log(`📊 Processing date ${date}:`, dayData);
+        Object.entries(dayData).forEach(([taskId, taskSnapshot]: [string, any]) => {
+          snapshots.push({
+            id: `${userId}/${date}/${taskId}`,
+            userId,
+            date,
+            taskId,
+            ...taskSnapshot
+          });
+        });
+      });
+
+      console.log(`📊 Processed ${snapshots.length} task snapshots`);
+      return snapshots.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    } catch (error) {
+      console.error('Error getting task daily snapshots:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Listen to task daily snapshots for a user
+   * @param userId User ID to listen for
+   * @param callback Callback function to handle updates
+   * @returns Unsubscribe function
+   */
+  static listenToTaskDailySnapshots(userId: string, callback: (snapshots: any[]) => void): () => void {
+    const taskSnapshotsRef = ref(realtimeDb, `taskDailySnapshots/${userId}`);
+    
+    return onValue(taskSnapshotsRef, (snapshot) => {
+      try {
+        const data = snapshot.val();
+        
+        if (!data) {
+          callback([]);
+          return;
+        }
+        
+        const snapshots: any[] = [];
+        Object.entries(data).forEach(([date, dayData]: [string, any]) => {
+          Object.entries(dayData).forEach(([taskId, taskSnapshot]: [string, any]) => {
+            snapshots.push({
+              id: `${userId}/${date}/${taskId}`,
+            userId,
+            date,
+              taskId,
+              ...taskSnapshot
+            });
+          });
+        });
+
+        callback(snapshots.sort((a, b) => (a.date || '').localeCompare(b.date || '')));
+      } catch (error) {
+        console.error('Error processing task daily snapshots:', error);
+        callback([]);
+      }
+    }, (error) => {
+      console.error('Error listening to task daily snapshots:', error);
+      callback([]);
+    });
+  }
+
+  /**
+   * Get daily snapshots for a user
+   * @param userId User ID to get snapshots for
+   * @param startDate Start date (YYYY-MM-DD format)
+   * @param endDate End date (YYYY-MM-DD format)
+   * @returns Promise with snapshots array
+   */
+  static async getUserDailySnapshots(userId: string, startDate?: string, endDate?: string): Promise<any[]> {
+    try {
+      const snapshotsRef = ref(realtimeDb, `userDailySnapshots/${userId}`);
+      const snapshot = await get(snapshotsRef);
+        const data = snapshot.val();
+        
+      if (!data) return [];
+      
+      let snapshots = Object.keys(data).map(date => ({
+            date,
+            ...data[date] 
+      }));
+      
+      // Filter by date range if provided
+      if (startDate && endDate) {
+        snapshots = snapshots.filter(snapshot => 
+          snapshot.date >= startDate && snapshot.date <= endDate
+        );
+      }
+      
+      // Sort by date (newest first)
+      return snapshots.sort((a, b) => b.date.localeCompare(a.date));
+    } catch (error) {
+      console.error('Error getting user daily snapshots:', error);
+      throw new Error('Failed to get user daily snapshots');
+    }
+  }
+
+  /**
+   * Listen to user daily snapshots in real-time
+   * @param userId User ID to listen to snapshots for
+   * @param callback Function to call when snapshots are updated
+   * @returns Unsubscribe function
+   */
+  static listenToUserDailySnapshots(userId: string, callback: (snapshots: any[]) => void): () => void {
+    const snapshotsRef = ref(realtimeDb, `userDailySnapshots/${userId}`);
+    
+    const unsubscribe = onValue(snapshotsRef, (snapshot) => {
+      try {
+        const data = snapshot.val();
+        
+        if (!data) {
+          callback([]);
+          return;
+        }
+        
+        // Convert to array and sort by date
+        const snapshots = Object.keys(data)
+          .map(date => ({ date, ...data[date] }))
+          .sort((a, b) => b.date.localeCompare(a.date));
+        
+        callback(snapshots);
+      } catch (error) {
+        console.error('Error processing user daily snapshots data:', error);
+        callback([]);
+      }
+    }, (error) => {
+      this.handleConnectionError(error, 'listenToUserDailySnapshots');
+      callback([]);
+    });
+    
+    return unsubscribe;
+  }
+
+  /**
+   * Get daily snapshots within a date range for tracking
+   * @param userId User ID to get snapshots for
+   * @param startDate Start date (YYYY-MM-DD format)
+   * @param endDate End date (YYYY-MM-DD format)
+   * @returns Promise with snapshots data in range
+   */
+  static async getDailySnapshotsInRange(
+    userId: string, 
+    startDate: string,
+    endDate: string
+  ): Promise<any[]> {
+    try {
+      const snapshotsRef = ref(realtimeDb, `userDailySnapshots/${userId}`);
+    const queryRef = query(
+        snapshotsRef, 
+      orderByKey(), 
+      startAt(startDate), 
+      endAt(endDate)
+    );
+    
+      const snapshot = await get(queryRef);
+      const data = snapshot.val();
+        
+      return data ? Object.entries(data)
+        .map(([date, snapshotData]) => ({
+            id: `${userId}/${date}`, 
+        userId,
+            date,
+          ...(snapshotData as any)
+          }))
+        .sort((a, b) => (a.date || '').localeCompare(b.date || '')) : [];
+      } catch (error) {
+      console.error('Error getting daily snapshots in range:', error);
+      throw new Error('Failed to get daily snapshots in range');
+    }
+  }
+
+  /**
+   * Process snapshots data for charts (simple version)
+   * @param snapshotsData - Array of daily snapshot data
+   * @param timePeriod - The time period for data aggregation
+   * @returns Processed data for all chart types
+   */
+  static processSnapshotsForCharts(snapshotsData: any[], timePeriod: string = 'week'): any {
+    return {
+      weeklyProgress: this.generateProgressDataFromSnapshots(snapshotsData, timePeriod),
+      taskCompletionData: this.generateTaskCompletionFromSnapshots(snapshotsData),
+      dailyPointsData: this.generateDailyPointsFromSnapshots(snapshotsData)
+      // Categories data is now handled separately by task snapshots
+    };
+  }
+
+  /**
+   * Generate complete progress data from snapshots with all time periods filled
+   * @param snapshots - Array of daily snapshot data
+   * @param timePeriod - Time period for aggregation
+   * @returns Complete progress data for charts with all days/months/years
+   */
+  private static generateProgressDataFromSnapshots(snapshots: any[], timePeriod: string): any[] {
+    const dataMap = new Map();
+    
+    // First, populate with actual data
+    snapshots.forEach(snapshot => {
+      const date = new Date(snapshot.date);
+      let groupKey: string;
+      let displayLabel: string;
+      
+      switch (timePeriod) {
+        case 'week':
+          // Group by day of week
+          groupKey = date.toISOString().split('T')[0];
+          displayLabel = date.toLocaleDateString('en-US', { weekday: 'short' });
+          break;
+        case 'month':
+          // Group by day of month (last 30 days)
+          groupKey = date.toISOString().split('T')[0];
+          displayLabel = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          break;
+        case 'year':
+          // Group by month of the year
+          groupKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          displayLabel = date.toLocaleDateString('en-US', { month: 'short' });
+          break;
+        case 'all-time':
+          // Group by quarter
+          const year = date.getFullYear();
+          const quarter = Math.floor(date.getMonth() / 3) + 1;
+          groupKey = `${year}-Q${quarter}`;
+          displayLabel = `Q${quarter} ${year.toString().slice(-2)}`;
+          break;
+        default:
+          groupKey = date.toISOString().split('T')[0];
+          displayLabel = date.toLocaleDateString('en-US', { weekday: 'short' });
+      }
+      
+      if (!dataMap.has(groupKey)) {
+        dataMap.set(groupKey, {
+          week: groupKey,
+          day: displayLabel,
+          hours: 0, 
+          totalHours: 0,
+          totalPoints: 0,
+          completedTasks: 0,
+          days: 0
         });
       }
       
-      console.log('Sample tracking data created successfully');
-    } catch (error) {
-      console.error('Error creating sample tracking data:', error);
-      throw error;
-    }
+      const data = dataMap.get(groupKey);
+      const hoursToAdd = snapshot.totalHoursTracked || 0;
+      data.hours += hoursToAdd;
+      data.totalHours += hoursToAdd;
+      data.totalPoints += (snapshot.totalPoints || 0);
+      data.completedTasks += (snapshot.completedTasks || 0);
+      data.days += 1;
+    });
+    
+    // Now fill in missing time periods with zero data
+    const now = new Date();
+    const completeData = this.generateCompleteTimePeriodData(timePeriod, now, dataMap);
+    
+    return completeData.sort((a, b) => a.week.localeCompare(b.week));
   }
+
+  /**
+   * Generate complete time period data with all days/months/years filled
+   * @param timePeriod - Time period type
+   * @param now - Current date
+   * @param dataMap - Map of existing data
+   * @returns Complete array with all time periods
+   */
+  private static generateCompleteTimePeriodData(timePeriod: string, now: Date, dataMap: Map<string, any>): any[] {
+    const completeData: any[] = [];
+    
+    switch (timePeriod) {
+      case 'week':
+        // Generate all 7 days of the current week starting from Monday
+        const startOfWeek = new Date(now);
+        const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Convert Sunday (0) to 6
+        startOfWeek.setDate(now.getDate() - daysFromMonday); // Start from Monday
+        
+        for (let i = 0; i < 7; i++) {
+          const date = new Date(startOfWeek);
+          date.setDate(startOfWeek.getDate() + i);
+          const dateStr = date.toISOString().split('T')[0];
+          const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+          
+          completeData.push(dataMap.get(dateStr) || {
+            week: dateStr,
+            day: dayName,
+      hours: 0, 
+            totalHours: 0,
+            totalPoints: 0,
+            completedTasks: 0,
+            days: 0
+          });
+        }
+        break;
+        
+      case 'month':
+        // Generate last 30 days
+        for (let i = 29; i >= 0; i--) {
+          const date = new Date(now);
+          date.setDate(now.getDate() - i);
+          const dateStr = date.toISOString().split('T')[0];
+          const dayLabel = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          
+          completeData.push(dataMap.get(dateStr) || {
+            week: dateStr,
+            day: dayLabel,
+            hours: 0,
+            totalHours: 0,
+            totalPoints: 0,
+            completedTasks: 0,
+            days: 0
+          });
+        }
+        break;
+        
+      case 'year':
+        // Generate current year starting from January
+        const currentYear = now.getFullYear();
+        for (let month = 0; month < 12; month++) {
+          const date = new Date(currentYear, month, 1); // January = 0, February = 1, etc.
+          const monthKey = `${currentYear}-${String(month + 1).padStart(2, '0')}`;
+          const monthLabel = date.toLocaleDateString('en-US', { month: 'short' });
+          
+          completeData.push(dataMap.get(monthKey) || {
+            week: monthKey,
+            day: monthLabel,
+            hours: 0,
+            totalHours: 0,
+            totalPoints: 0,
+            completedTasks: 0,
+            days: 0
+          });
+        }
+        break;
+        
+      case 'all-time':
+        // Generate last 8 quarters (2 years)
+        const allTimeYear = now.getFullYear();
+        const currentQuarter = Math.floor(now.getMonth() / 3) + 1; // Q1=1, Q2=2, Q3=3, Q4=4
+        
+        // Generate quarters starting from 2 years ago
+        for (let i = 7; i >= 0; i--) {
+          const quartersBack = i;
+          const totalMonthsBack = quartersBack * 3;
+          
+          const quarterDate = new Date(now);
+          quarterDate.setMonth(now.getMonth() - totalMonthsBack);
+          
+          const year = quarterDate.getFullYear();
+          const quarter = Math.floor(quarterDate.getMonth() / 3) + 1;
+          const quarterKey = `${year}-Q${quarter}`;
+          const quarterLabel = `Q${quarter} ${year.toString().slice(-2)}`;
+          
+          completeData.push(dataMap.get(quarterKey) || {
+            week: quarterKey,
+            day: quarterLabel,
+            hours: 0,
+            totalHours: 0,
+            totalPoints: 0,
+            completedTasks: 0,
+            days: 0
+          });
+        }
+        break;
+        
+      default:
+        // Fallback to existing data
+        return Array.from(dataMap.values());
+    }
+    
+    return completeData;
+  }
+
+  /**
+   * Generate task completion data from snapshots
+   * @param snapshots - Array of daily snapshot data
+   * @returns Task completion data for charts
+   */
+  private static generateTaskCompletionFromSnapshots(snapshots: any[]): any[] {
+    // Group by date and create summary data
+    const dailyData = snapshots.map(snapshot => ({
+      date: snapshot.date,
+      completed: snapshot.completedTasks || 0,
+      total: snapshot.totalTasks || 0,
+      count: snapshot.completedTasks || 0, // Add count property for selectors
+      percentage: (snapshot.totalTasks && snapshot.totalTasks > 0) ? 
+        Math.round((snapshot.completedTasks || 0) / snapshot.totalTasks * 100) : 0
+    }));
+    
+    // Create summary entries for the selector
+    const totalCompleted = dailyData.reduce((sum, day) => sum + day.completed, 0);
+    const totalTasks = dailyData.reduce((sum, day) => sum + day.total, 0);
+    
+    return [
+      {
+        id: 'completed',
+        count: totalCompleted,
+        label: 'Completed',
+        category: 'Completed',
+        color: '#4CAF50',
+        percentage: totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0
+      },
+      { 
+        id: 'remaining',
+        count: totalTasks - totalCompleted, 
+        label: 'Remaining',
+        category: 'Remaining',
+        color: '#FF5722',
+        percentage: totalTasks > 0 ? Math.round(((totalTasks - totalCompleted) / totalTasks) * 100) : 0
+      }
+    ];
+  }
+
+  /**
+   * Generate daily points data from snapshots
+   * @param snapshots - Array of daily snapshot data
+   * @returns Daily points data for charts
+   */
+  private static generateDailyPointsFromSnapshots(snapshots: any[]): any[] {
+    return snapshots.map(snapshot => ({
+      date: snapshot.date,
+      points: snapshot.totalPoints || 0,
+      level: snapshot.level || 1
+    }));
+  }
+
+  /**
+   * Generate categories data from task snapshots
+   * @param taskSnapshots - Array of task snapshot data
+   * @returns Categories data for summary
+   */
+  static generateCategoriesFromTaskSnapshots(taskSnapshots: any[]): any[] {
+    const categoryMap = new Map();
+    
+    taskSnapshots.forEach(taskSnapshot => {
+      const category = taskSnapshot.category || 'other';
+      
+      if (!categoryMap.has(category)) {
+        categoryMap.set(category, {
+          id: category,
+          category: category,
+          name: category,
+          hours: 0,
+          totalHours: 0,
+          totalPoints: 0,
+          completedTasks: 0,
+          color: this.getCategoryColor(category),
+          icon: this.getCategoryIcon(category)
+        });
+      }
+      
+      const categoryData = categoryMap.get(category);
+      if (categoryData) {
+        categoryData.hours += (taskSnapshot.hoursTracked || 0);
+        categoryData.totalHours += (taskSnapshot.hoursTracked || 0);
+        categoryData.totalPoints += (taskSnapshot.points || 0);
+        if (taskSnapshot.completed) {
+          categoryData.completedTasks += 1;
+        }
+      }
+    });
+    
+    return Array.from(categoryMap.values()).sort((a, b) => b.totalHours - a.totalHours);
+  }
+
+  /**
+   * Generate weekly progress data from task snapshots
+   * @param taskSnapshots - Array of task snapshot data
+   * @param timePeriod - Time period for aggregation
+   * @returns Weekly progress data for bar charts
+   */
+  static generateWeeklyProgressFromTaskSnapshots(taskSnapshots: any[], timePeriod: string): any[] {
+    const dataMap = new Map();
+    
+    // First, populate with actual data
+    taskSnapshots.forEach(taskSnapshot => {
+      const date = new Date(taskSnapshot.date);
+      let groupKey: string;
+      let displayLabel: string;
+    
+    switch (timePeriod) {
+      case 'week':
+          groupKey = date.toISOString().split('T')[0];
+          displayLabel = date.toLocaleDateString('en-US', { weekday: 'short' });
+        break;
+      case 'month':
+          groupKey = date.toISOString().split('T')[0];
+          displayLabel = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        break;
+      case 'year':
+          groupKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          displayLabel = date.toLocaleDateString('en-US', { month: 'short' });
+          break;
+        case 'all-time':
+          const year = date.getFullYear();
+          const quarter = Math.floor(date.getMonth() / 3) + 1;
+          groupKey = `${year}-Q${quarter}`;
+          displayLabel = `Q${quarter} ${year.toString().slice(-2)}`;
+        break;
+      default:
+          groupKey = date.toISOString().split('T')[0];
+          displayLabel = date.toLocaleDateString('en-US', { weekday: 'short' });
+      }
+      
+      if (!dataMap.has(groupKey)) {
+        dataMap.set(groupKey, {
+          week: groupKey,
+          day: displayLabel,
+          hours: 0,
+          totalHours: 0,
+          totalPoints: 0,
+          completedTasks: 0,
+          days: 0
+        });
+      }
+      
+      const data = dataMap.get(groupKey);
+      data.hours += (taskSnapshot.hoursTracked || 0);
+      data.totalHours += (taskSnapshot.hoursTracked || 0);
+      data.totalPoints += (taskSnapshot.points || 0);
+      if (taskSnapshot.completed) {
+        data.completedTasks += 1;
+      }
+      data.days += 1;
+    });
+    
+    // Fill in missing time periods with zero data
+    const now = new Date();
+    const completeData = this.generateCompleteTimePeriodData(timePeriod, now, dataMap);
+    
+    return completeData.sort((a, b) => a.week.localeCompare(b.week));
+  }
+
+  /**
+   * Generate task completion data from task snapshots
+   * @param taskSnapshots - Array of task snapshot data
+   * @returns Task completion data for pie charts
+   */
+  static generateTaskCompletionFromTaskSnapshots(taskSnapshots: any[]): any[] {
+    // Aggregate all task completion data across all dates
+    let totalCompleted = 0;
+    let totalTasks = 0;
+    
+    taskSnapshots.forEach(taskSnapshot => {
+      totalTasks += 1;
+      if (taskSnapshot.completed) {
+        totalCompleted += 1;
+      }
+    });
+    
+    const totalPending = totalTasks - totalCompleted;
+    const completedPercentage = totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0;
+    const pendingPercentage = 100 - completedPercentage;
+    
+    // Return data in the format expected by the UI
+    return [
+      {
+        id: 'completed',
+        category: 'Completed',
+        count: totalCompleted,
+        percentage: completedPercentage,
+        color: '#4CAF50'
+      },
+      {
+        id: 'pending',
+        category: 'Pending',
+        count: totalPending,
+        percentage: pendingPercentage,
+        color: '#FF5722'
+      }
+    ];
+  }
+
+  /**
+   * Generate daily points data from task snapshots
+   * @param taskSnapshots - Array of task snapshot data
+   * @returns Daily points data for line charts
+   */
+  static generateDailyPointsFromTaskSnapshots(taskSnapshots: any[]): any[] {
+    const dailyData = new Map();
+    
+    taskSnapshots.forEach(taskSnapshot => {
+      const date = taskSnapshot.date;
+      if (!dailyData.has(date)) {
+        dailyData.set(date, {
+          date,
+          points: 0,
+          level: 1,
+          activity: 'Task completed' // Default activity
+        });
+      }
+      
+      const dayData = dailyData.get(date);
+      dayData.points += (taskSnapshot.points || 0);
+      // Simple level calculation based on points
+      dayData.level = Math.floor(dayData.points / 100) + 1;
+      
+      // Update activity based on task completion
+      if (taskSnapshot.completed) {
+        dayData.activity = `Completed: ${taskSnapshot.title}`;
+      }
+    });
+    
+    return Array.from(dailyData.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  /**
+   * Generate categories data from snapshots (legacy - uses nested tasks)
+   * @param snapshots - Array of daily snapshot data
+   * @returns Categories data for summary
+   */
+  private static generateCategoriesFromSnapshots(snapshots: any[]): any[] {
+    const categoryMap = new Map();
+    
+    snapshots.forEach(snapshot => {
+      // Extract category data from snapshot tasks
+      const tasks = snapshot.tasks || {};
+      
+      Object.entries(tasks).forEach(([taskId, taskData]: [string, any]) => {
+        const category = taskData.category || 'other';
+        
+        if (!categoryMap.has(category)) {
+        categoryMap.set(category, {
+            id: category,
+            category: category,
+            name: category,
+            hours: 0,
+            totalHours: 0,
+            totalPoints: 0,
+            completedTasks: 0,
+          color: this.getCategoryColor(category),
+          icon: this.getCategoryIcon(category)
+        });
+      }
+        
+        const categoryData = categoryMap.get(category);
+        if (categoryData) {
+          categoryData.hours += (taskData.hoursTracked || 0);
+          categoryData.totalHours += (taskData.hoursTracked || 0);
+          categoryData.totalPoints += (taskData.points || 0);
+          if (taskData.completed) {
+            categoryData.completedTasks += 1;
+          }
+        }
+      });
+    });
+    
+    return Array.from(categoryMap.values()).sort((a, b) => b.totalHours - a.totalHours);
+  }
+
+
 }

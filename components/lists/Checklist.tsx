@@ -146,7 +146,7 @@ export const Checklist: React.FC<ChecklistProps> = ({
           />
         </View>
         <ThemedText style={styles.progressText}>
-          {completedCount}/{totalCount} completed ({progressPercentage.toFixed(0)}%)
+          {completedCount}/{totalCount} completed ({(progressPercentage || 0).toFixed(0)}%)
         </ThemedText>
       </View>
     );

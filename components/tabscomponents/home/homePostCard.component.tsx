@@ -15,9 +15,11 @@ interface Post {
   video: string | null;
   timestamp: string;
   likes: number;
+  dislikes: number;
   comments: number;
   shares: number;
   isLiked: boolean;
+  isDisliked: boolean;
   type: 'general' | 'achievement' | 'task' | 'question';
   isPublic: boolean;
 }
@@ -25,12 +27,13 @@ interface Post {
 interface PostCardProps {
   post: Post;
   onLike: (postId: string | number) => void;
+  onDislike: (postId: string | number) => void;
   onComment: (postId: string | number) => void;
   onShare: (postId: string | number) => void;
   onDelete?: (postId: string | number) => void;
 }
 
-export const PostCard: React.FC<PostCardProps> = ({ post, onLike, onComment, onShare, onDelete }) => {
+export const PostCard: React.FC<PostCardProps> = ({ post, onLike, onDislike, onComment, onShare, onDelete }) => {
   const [showDeleteButton, setShowDeleteButton] = useState(false);
 
   // Get post type configuration
@@ -144,9 +147,17 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onLike, onComment, onS
 
           <TouchableOpacity 
             style={[styles.actionButton, styles.downvoteButton]}
-            onPress={() => onLike(post.id)}
+            onPress={() => onDislike(post.id)}
           >
-            <ThemedText style={styles.downvoteIcon}>⬇️</ThemedText>
+            <ThemedText style={styles.downvoteIcon}>
+              {post.isDisliked ? '⬇️' : '⬇️'}
+            </ThemedText>
+            <ThemedText style={[
+              styles.downvoteText,
+              post.isDisliked && styles.dislikedText
+            ]}>
+              {post.dislikes}
+            </ThemedText>
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -302,6 +313,12 @@ const styles = StyleSheet.create({
   },
   downvoteIcon: {
     fontSize: 16,
+    marginRight: 4,
+  },
+  downvoteText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#878A8C',
   },
   upvoteText: {
     fontSize: 12,
@@ -320,6 +337,9 @@ const styles = StyleSheet.create({
   },
   likedText: {
     color: '#FF4500',
+  },
+  dislikedText: {
+    color: '#7193FF',
   },
   deleteButtonContainer: {
     paddingHorizontal: 16,

@@ -161,7 +161,7 @@ export const selectMaxHours = createSelector(
 
 export const selectTotalHours = createSelector(
   [selectTrackingData],
-  (trackingData) => formatHours(trackingData.reduce((sum, item) => sum + (item.hours || 0), 0))
+  (trackingData) => formatHours(trackingData.reduce((sum, item) => sum + (item.totalHours || item.hours || 0), 0))
 )
 
 export const selectCategories = createSelector(
@@ -205,8 +205,20 @@ export const selectMaxPoints = createSelector(
 export const selectTotalPoints = createSelector(
   [selectDailyPointsData],
   (dailyPointsData) => {
-    const lastEntry = dailyPointsData[dailyPointsData.length - 1]
-    return lastEntry ? lastEntry.points : 0
+    // Get today's date in YYYY-MM-DD format
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Find today's entry
+    const todayEntry = dailyPointsData.find(entry => entry.date === today);
+    
+    // If no today's entry, get the most recent entry
+    if (todayEntry) {
+      return todayEntry.points || 0;
+    }
+    
+    // Fallback to last entry if no today's data
+    const lastEntry = dailyPointsData[dailyPointsData.length - 1];
+    return lastEntry ? (lastEntry.points || 0) : 0;
   }
 )
 

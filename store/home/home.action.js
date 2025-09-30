@@ -238,3 +238,14 @@ export const fetchPosts = async () => {
     throw error;
   }
 }
+
+// Instant UI toggle actions (optimistic updates)
+export const toggleLikePost = (postId) => ({
+  type: HOME_ACTION_TYPES.LIKE_POST,
+  payload: postId
+})
+
+export const toggleDislikePost = (postId) => ({
+  type: HOME_ACTION_TYPES.DISLIKE_POST,
+  payload: postId
+})

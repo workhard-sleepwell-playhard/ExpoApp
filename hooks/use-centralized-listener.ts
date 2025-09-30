@@ -11,11 +11,11 @@ import { setPosts } from '../store/home/home.action';
 import { setUserData } from '../store/profile/profile.action';
 import { setTasks } from '../store/task/task.action';
 import { setRankings } from '../store/leaderboards/leaderboards.action';
-import { loadTrackingData } from '../store/tracking/tracking.action';
+import { loadTrackingData, setWeeklyProgressData, setTaskCompletionData, setDailyPointsData, setCategoriesData, loadCustomDateRangeTaskSnapshotData } from '../store/tracking/tracking.action';
 import { SimpleRealtimeService } from '../src/services/simple-realtime';
 
 /**
- * Generate tracking data from user data changes
+ * Generate tracking data from user data changes (updates Redux tracking state)
  * This follows the single source of truth principle
  * Only shows data that actually exists, no fake data generation
  */
@@ -28,7 +28,6 @@ function generateTrackingDataFromUserData(userData: any, dispatch: any) {
       // No task data, show empty state
       const trackingData = {
         sessions: [],
-        analytics: [],
         weeklyProgress: [],
         taskCompletionData: [],
         dailyPointsData: [],
@@ -38,35 +37,9 @@ function generateTrackingDataFromUserData(userData: any, dispatch: any) {
       return;
     }
 
-    // Generate today's analytics from actual user stats
-    const today = new Date().toISOString().split('T')[0];
-    
-    const analyticsData = {
-      userId: userData.userId,
-      date: today,
-      totalHoursTracked: 0, // Only from actual time tracking sessions
-      totalSessions: 0, // Only from actual time tracking sessions
-      tasksCompleted: userData.completedTasks || 0,
-      tasksPending: userData.pendingTasks || 0,
-      tasksOverdue: userData.overdueTasks || 0,
-      pointsEarned: userData.totalPoints || 0,
-      productivityScore: userData.totalTasks > 0 ? 
-        Math.round(((userData.completedTasks || 0) / userData.totalTasks) * 100) : 0,
-      categories: {}, // Only from actual time tracking sessions
-      sourceData: {
-        tasks: [], // Only from actual task data
-        sessions: [] // Only from actual time tracking sessions
-      },
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    };
-
-    // No need to persist - we generate data on-demand from user data (single source of truth)
-
     // Generate chart data from actual user data only
     const trackingData = {
       sessions: [], // Empty - only from time tracking
-      analytics: [analyticsData],
       weeklyProgress: generateWeeklyProgressFromUserData(userData),
       taskCompletionData: generateTaskCompletionFromUserData(userData),
       dailyPointsData: generateDailyPointsFromUserData(userData),
@@ -186,10 +159,15 @@ export function useCentralizedListener(options?: {
   enableTasks?: boolean;
   enableLeaderboards?: boolean;
   enableTrackingData?: boolean;
+  enableSnapshots?: boolean;
+  enableTaskSnapshots?: boolean;
 }) {
   const dispatch = useDispatch();
   const { currentUser } = useAuth();
   const isInitialized = useRef(false);
+  
+  // Get current time period for snapshot processing
+  const currentTimePeriod = useSelector((state: any) => state.tracking?.timePeriod || 'week');
 
   // Default to all listeners if no options provided (backward compatibility)
   const {
@@ -197,7 +175,9 @@ export function useCentralizedListener(options?: {
     enableUserData = true,
     enableTasks = true,
     enableLeaderboards = true,
-    enableTrackingData = false
+    enableTrackingData = false,
+    enableSnapshots = false,
+    enableTaskSnapshots = false
   } = options || {};
 
   useEffect(() => {
@@ -205,27 +185,45 @@ export function useCentralizedListener(options?: {
 
     // Initialize only requested listeners
     centralizedListener.initializeListeners(currentUser.uid, {
-      onPostsUpdate: enablePosts ? (posts) => {
-        // Transform posts to match our UI format
-        const transformedPosts = posts.map(post => ({
-          id: post.id,
-          postId: post.id,
-          userId: post.userId,
-          user: {
-            name: post.userDisplayName || 'User',
-            avatar: post.userAvatar || '👤',
-            username: post.userUsername || '@user'
-          },
-          content: post.content,
-          image: post.image || null,
-          video: post.video || null,
-          type: post.type || 'general',
-          isPublic: post.isPublic !== false,
-          timestamp: post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'now',
-          likes: post.likes ? Object.keys(post.likes).length : 0,
-          comments: post.comments || 0,
-          shares: post.shares || 0,
-          isLiked: false, // We'll implement this later
+      onPostsUpdate: enablePosts ? async (posts) => {
+        // Transform posts to match our UI format and check user interactions
+        const transformedPosts = await Promise.all(posts.map(async (post) => {
+          let isLiked = false;
+          let isDisliked = false;
+          
+          // Check user's interaction with this post
+          if (currentUser?.uid) {
+            try {
+              const interaction = await SimpleRealtimeService.getUserPostInteraction(post.id, currentUser.uid);
+              isLiked = interaction === 'like';
+              isDisliked = interaction === 'dislike';
+            } catch (error) {
+              console.error('Error checking user post interaction:', error);
+            }
+          }
+          
+          return {
+            id: post.id,
+            postId: post.id,
+            userId: post.userId,
+            user: {
+              name: post.userDisplayName || 'User',
+              avatar: post.userAvatar || '👤',
+              username: post.userUsername || '@user'
+            },
+            content: post.content,
+            image: post.image || null,
+            video: post.video || null,
+            type: post.type || 'general',
+            isPublic: post.isPublic !== false,
+            timestamp: post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'now',
+            likes: post.likes || 0,
+            dislikes: post.dislikes || 0,
+            comments: post.comments || 0,
+            shares: post.shares || 0,
+            isLiked,
+            isDisliked,
+          };
         }));
         
         dispatch(setPosts(transformedPosts));
@@ -285,10 +283,8 @@ export function useCentralizedListener(options?: {
           
           dispatch(setUserData(completeUserData));
           
-          // Generate tracking data from user data changes (always when userData is enabled)
-          if (enableUserData) {
-            generateTrackingDataFromUserData(completeUserData, dispatch);
-          }
+          // Note: We don't generate tracking data from user data anymore
+          // Tracking tab uses snapshot data, other tabs don't need tracking state
         }
       } : undefined,
 
@@ -327,6 +323,50 @@ export function useCentralizedListener(options?: {
         if (trackingData) {
           dispatch(loadTrackingData(trackingData));
         }
+      } : undefined,
+
+      onUserSnapshotsUpdate: enableSnapshots ? (snapshots) => {
+        // Process snapshots for charts and update Redux state
+        if (snapshots && snapshots.length > 0) {
+          // Process snapshots for the current time period
+          const processedData = SimpleRealtimeService.processSnapshotsForCharts(snapshots, currentTimePeriod);
+          
+          // Update Redux state with processed data (categories handled by task snapshots)
+          dispatch(setWeeklyProgressData(processedData.weeklyProgress || []));
+          dispatch(setTaskCompletionData(processedData.taskCompletionData || []));
+          dispatch(setDailyPointsData(processedData.dailyPointsData || []));
+        }
+      } : undefined,
+
+      onTaskSnapshotsUpdate: enableTaskSnapshots ? (taskSnapshots) => {
+        // Process task snapshots for all chart data
+        console.log('📊 Task snapshots callback triggered:', taskSnapshots?.length || 0, 'snapshots');
+        if (taskSnapshots && taskSnapshots.length > 0) {
+          console.log('📊 Task snapshots received:', taskSnapshots.length);
+          console.log('📊 Current time period:', currentTimePeriod);
+          console.log('📊 Sample task snapshot:', taskSnapshots[0]);
+          
+          // Generate all chart data from task snapshots
+          const categoriesData = SimpleRealtimeService.generateCategoriesFromTaskSnapshots(taskSnapshots);
+          const weeklyProgressData = SimpleRealtimeService.generateWeeklyProgressFromTaskSnapshots(taskSnapshots, currentTimePeriod);
+          const taskCompletionData = SimpleRealtimeService.generateTaskCompletionFromTaskSnapshots(taskSnapshots);
+          const dailyPointsData = SimpleRealtimeService.generateDailyPointsFromTaskSnapshots(taskSnapshots);
+          
+          console.log('📊 Generated data:', {
+            categories: categoriesData?.length || 0,
+            weeklyProgress: weeklyProgressData?.length || 0,
+            taskCompletion: taskCompletionData?.length || 0,
+            dailyPoints: dailyPointsData?.length || 0
+          });
+          
+          // Update all Redux state
+          dispatch(setCategoriesData(categoriesData || []));
+          dispatch(setWeeklyProgressData(weeklyProgressData || []));
+          dispatch(setTaskCompletionData(taskCompletionData || []));
+          dispatch(setDailyPointsData(dailyPointsData || []));
+        } else {
+          console.log('📊 No task snapshots data received');
+        }
       } : undefined
     });
 
@@ -337,7 +377,7 @@ export function useCentralizedListener(options?: {
       centralizedListener.cleanup();
       isInitialized.current = false;
     };
-  }, [currentUser?.uid, dispatch]);
+  }, [currentUser?.uid, dispatch, currentTimePeriod]);
 
   return {
     isReady: centralizedListener.isReady,

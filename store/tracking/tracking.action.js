@@ -278,6 +278,105 @@ export const loadCustomDateRangeData = (analyticsData) => {
   }
 }
 
+// Action to load snapshot data for different time periods
+export const loadSnapshotDataForTimePeriod = (userId, timePeriod) => {
+  return async (dispatch) => {
+    try {
+      const now = new Date();
+      let startDate, endDate;
+      
+      // Calculate date range based on time period
+      switch (timePeriod) {
+        case 'week':
+          startDate = new Date(now);
+          startDate.setDate(now.getDate() - 7);
+          endDate = now;
+          break;
+        case 'month':
+          startDate = new Date(now);
+          startDate.setDate(now.getDate() - 30);
+          endDate = now;
+          break;
+        case 'year':
+          startDate = new Date(now);
+          startDate.setFullYear(now.getFullYear() - 1);
+          endDate = now;
+          break;
+        case 'all-time':
+          startDate = new Date('2020-01-01'); // Far back date
+          endDate = now;
+          break;
+        default:
+          startDate = new Date(now);
+          startDate.setDate(now.getDate() - 7);
+          endDate = now;
+      }
+      
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+      
+      console.log(`📊 Loading task snapshots for ${timePeriod} period: ${startDateStr} to ${endDateStr}`);
+      
+      // Fetch task snapshots for all data
+      const taskSnapshotsData = await SimpleRealtimeService.getTaskDailySnapshots(userId, startDateStr, endDateStr);
+      
+      console.log(`📊 Fetched ${taskSnapshotsData.length} task snapshots`);
+      if (taskSnapshotsData.length > 0) {
+        console.log('📊 Sample task snapshot:', taskSnapshotsData[0]);
+      }
+      
+      // Generate all chart data from task snapshots
+      const categoriesData = SimpleRealtimeService.generateCategoriesFromTaskSnapshots(taskSnapshotsData);
+      const weeklyProgressData = SimpleRealtimeService.generateWeeklyProgressFromTaskSnapshots(taskSnapshotsData, timePeriod);
+      const taskCompletionData = SimpleRealtimeService.generateTaskCompletionFromTaskSnapshots(taskSnapshotsData);
+      const dailyPointsData = SimpleRealtimeService.generateDailyPointsFromTaskSnapshots(taskSnapshotsData);
+      
+      console.log('📊 Generated chart data:', {
+        categories: categoriesData?.length || 0,
+        weeklyProgress: weeklyProgressData?.length || 0,
+        taskCompletion: taskCompletionData?.length || 0,
+        dailyPoints: dailyPointsData?.length || 0
+      });
+      
+      // Update Redux state with processed data
+      dispatch(setCategoriesData(categoriesData || []));
+      dispatch(setWeeklyProgressData(weeklyProgressData || []));
+      dispatch(setTaskCompletionData(taskCompletionData || []));
+      dispatch(setDailyPointsData(dailyPointsData || []));
+      
+      console.log(`📊 Loaded ${taskSnapshotsData.length} task snapshots for ${timePeriod} period`);
+    } catch (error) {
+      console.error('Error loading snapshot data for time period:', error);
+    }
+  }
+}
+
+// Action to load custom date range task snapshot data
+export const loadCustomDateRangeTaskSnapshotData = (userId, fromDate, toDate) => {
+  return async (dispatch) => {
+    try {
+      // Fetch task snapshot data for the custom date range
+      const taskSnapshotsData = await SimpleRealtimeService.getTaskDailySnapshots(userId, fromDate, toDate);
+      
+      // Generate all chart data from task snapshots
+      const categoriesData = SimpleRealtimeService.generateCategoriesFromTaskSnapshots(taskSnapshotsData);
+      const weeklyProgressData = SimpleRealtimeService.generateWeeklyProgressFromTaskSnapshots(taskSnapshotsData, 'custom');
+      const taskCompletionData = SimpleRealtimeService.generateTaskCompletionFromTaskSnapshots(taskSnapshotsData);
+      const dailyPointsData = SimpleRealtimeService.generateDailyPointsFromTaskSnapshots(taskSnapshotsData);
+      
+      // Update Redux state with processed data
+      dispatch(setCategoriesData(categoriesData || []));
+      dispatch(setWeeklyProgressData(weeklyProgressData || []));
+      dispatch(setTaskCompletionData(taskCompletionData || []));
+      dispatch(setDailyPointsData(dailyPointsData || []));
+      
+      console.log(`📊 Loaded ${taskSnapshotsData.length} task snapshots for custom date range`);
+    } catch (error) {
+      console.error('Error loading custom date range task snapshot data:', error);
+    }
+  }
+}
+
 // Action to create sample data for testing
 export const createSampleData = () => {
   return async (dispatch, getState) => {

@@ -88,7 +88,25 @@ export const homeReducer = (state = HOME_INITIAL_STATE, action = {}) => {
             ? { 
                 ...post, 
                 isLiked: !post.isLiked, 
-                likes: post.isLiked ? post.likes - 1 : post.likes + 1 
+                isDisliked: false, // Remove dislike when liking
+                likes: post.isLiked ? post.likes - 1 : post.likes + 1,
+                dislikes: post.isDisliked ? Math.max(post.dislikes - 1, 0) : post.dislikes
+              }
+            : post
+        ),
+      }
+    
+    case HOME_ACTION_TYPES.DISLIKE_POST:
+      return {
+        ...state,
+        posts: state.posts.map(post => 
+          post.id === payload 
+            ? { 
+                ...post, 
+                isDisliked: !post.isDisliked,
+                isLiked: false, // Remove like when disliking
+                dislikes: post.isDisliked ? Math.max(post.dislikes - 1, 0) : post.dislikes + 1,
+                likes: post.isLiked ? Math.max(post.likes - 1, 0) : post.likes
               }
             : post
         ),

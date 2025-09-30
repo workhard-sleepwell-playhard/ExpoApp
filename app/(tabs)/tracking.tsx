@@ -7,6 +7,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { useCentralizedListener } from '../../hooks/use-centralized-listener';
+import { BarChart } from '@/components/charts/BarChart';
 
 // Import Redux selectors and actions
 import { 
@@ -24,7 +25,7 @@ import {
   selectCustomDateFrom,
   selectCustomDateTo
 } from '../../store/tracking/tracking.selector';
-import { selectUserData } from '../../store/profile/profile.selector';
+import { useAuth } from '@/components/auth/AuthProvider';
 import { 
   handleNextSlide, 
   handlePrevSlide, 
@@ -36,7 +37,8 @@ import {
   createSampleData,
   setCustomDateFrom,
   setCustomDateTo,
-  loadCustomDateRangeData
+  loadCustomDateRangeData,
+  loadSnapshotDataForTimePeriod
 } from '../../store/tracking/tracking.action';
 
 // Import new components
@@ -59,12 +61,14 @@ export default function TrackingScreen() {
   // Initialize only tracking-related listeners (following home/profile pattern)
   useCentralizedListener({
     enablePosts: false,
-    enableUserData: true,      // Single source of truth - user data drives tracking
+    enableUserData: false,     // Disabled - only use snapshot data for tracking
     enableTasks: false,
     enableLeaderboards: false,
-    enableTrackingData: false  // Disabled - only use userData generation (no database conflicts)
+    enableTrackingData: false, // Disabled - only use snapshot data (no database conflicts)
+    enableSnapshots: false,    // Disabled - now using task snapshots only
+    enableTaskSnapshots: true  // Enable task snapshots for all data
   });
-  
+
   // Redux state - Use consolidated selector for better performance
   const trackingState = useSelector(selectTrackingState);
   const {
@@ -88,15 +92,35 @@ export default function TrackingScreen() {
   const customDateFrom = useSelector(selectCustomDateFrom);
   const customDateTo = useSelector(selectCustomDateTo);
   
-  // User data from single source of truth (following home/profile pattern)
-  const userData = useSelector(selectUserData);
-  const userId = userData?.userId;
+  // Get user ID from auth context (since we disabled userData listener)
+  const { currentUser } = useAuth();
+  const userId = currentUser?.uid;
+
+  // Load initial snapshot data when component mounts or user changes
+  React.useEffect(() => {
+    if (userId) {
+      // Load snapshot data for the current time period
+      dispatch(loadSnapshotDataForTimePeriod(userId, timePeriod));
+    }
+  }, [userId, timePeriod, dispatch]);
 
   // Use real data from Firebase
   const trackingData = categoriesData; // Categories data for the summary
   const weeklyProgress = weeklyProgressData; // Real weekly progress data
   const taskCompletion = taskCompletionData; // Task completion data
   const dailyPoints = dailyPointsData; // Daily points data
+  
+  // Debug: Log the actual data being used by UI components
+  console.log('🔍 UI Data Check:', {
+    weeklyProgress: weeklyProgress?.length || 0,
+    taskCompletion: taskCompletion?.length || 0,
+    dailyPoints: dailyPoints?.length || 0,
+    categoriesData: categoriesData?.length || 0,
+    sampleWeekly: weeklyProgress?.[0],
+    sampleTask: taskCompletion?.[0],
+    samplePoints: dailyPoints?.[0],
+    sampleCategory: categoriesData?.[0]
+  });
   
   // Filter data based on time period
   const getFilteredData = (data: any[], timePeriod: string) => {
@@ -153,6 +177,7 @@ export default function TrackingScreen() {
   const timePeriodIcon = useSelector(selectTimePeriodIcon);
 
   const navigateTimePeriodUI = (direction: 'prev' | 'next') => {
+    // Only update the UI state - useEffect will handle data fetching
     dispatch(navigateTimePeriodWithData(direction));
   };
 
@@ -166,10 +191,21 @@ export default function TrackingScreen() {
 
   // Check if there's data to display
   const hasData = () => {
-    const hasWeeklyData = weeklyProgress && weeklyProgress.some((day: any) => day.hours > 0);
-    const hasTaskData = taskCompletion && taskCompletion.some((task: any) => task.value > 0);
-    const hasPointsData = dailyPoints && dailyPoints.some((point: any) => point.points > 0);
-    const hasCategoriesData = trackingData && trackingData.some((cat: any) => cat.hours > 0);
+    const hasWeeklyData = weeklyProgress && weeklyProgress.some((day: any) => (day.hours || 0) > 0);
+    const hasTaskData = taskCompletion && taskCompletion.some((task: any) => (task.count || 0) > 0);
+    const hasPointsData = dailyPoints && dailyPoints.some((point: any) => (point.points || 0) > 0);
+    const hasCategoriesData = trackingData && trackingData.some((cat: any) => (cat.hours || 0) > 0);
+    
+    console.log('🔍 hasData check:', {
+      hasWeeklyData,
+      hasTaskData,
+      hasPointsData,
+      hasCategoriesData,
+      weeklyProgressLength: weeklyProgress?.length || 0,
+      taskCompletionLength: taskCompletion?.length || 0,
+      dailyPointsLength: dailyPoints?.length || 0,
+      trackingDataLength: trackingData?.length || 0
+    });
     
     return hasWeeklyData || hasTaskData || hasPointsData || hasCategoriesData;
   };
@@ -191,18 +227,10 @@ export default function TrackingScreen() {
       dispatch(handleApplyCustomDateRange(fromDate, toDate));
       
       if (userId) {
-        // Query analytics data for the selected date range
-        const analyticsData = await SimpleRealtimeService.getDailyAnalyticsInRange(
-          userId, 
-          fromDate, 
-          toDate
-        );
-        
-        console.log('📊 Custom date range analytics loaded:', analyticsData.length, 'items');
         console.log('📅 Date range:', fromDate, 'to', toDate);
         
-        // Process and update Redux state with the fetched data
-        dispatch(loadCustomDateRangeData(analyticsData));
+        // Process and update Redux state with snapshot data
+        dispatch(loadCustomDateRangeData(userId, fromDate, toDate));
         
         console.log('✅ Custom date range data applied to UI');
       } else {
@@ -225,25 +253,29 @@ export default function TrackingScreen() {
     dispatch(handlePrevSlide());
   };
 
-  const renderBarChart = () => (
-    <View style={styles.chartContainer}>
-      {weeklyProgress.map((day: any, index: number) => (
-        <View key={index} style={styles.chartBar}>
-          <View 
-            style={[
-              styles.bar, 
-              { 
-                height: (day.hours / maxHours) * 100,
-                backgroundColor: Colors[colorScheme ?? 'light'].tint,
-              }
-            ]} 
-          />
-          <ThemedText style={styles.barLabel}>{day.day}</ThemedText>
-          <ThemedText style={styles.barValue}>{day.hours.toFixed(1)}h</ThemedText>
-        </View>
-      ))}
-    </View>
-  );
+  const renderBarChart = () => {
+    // Convert weeklyProgress data to BarChart format
+    const barChartData = weeklyProgress.map((day: any) => ({
+      label: day.day,
+      value: day.hours || 0,
+      color: Colors[colorScheme ?? 'light'].tint,
+    }));
+
+    return (
+      <BarChart
+        data={barChartData}
+        orientation="vertical"
+        size="small"
+        showValues={true}
+        showLabels={true}
+        enableHorizontalScroll={true}
+        scrollThreshold={7}
+        barWidth={50}
+        formatValue={(value) => `${value.toFixed(1)}h`}
+        style={styles.barChartContainer}
+      />
+    );
+  };
 
   const renderPieChart = () => {
 
@@ -278,6 +310,13 @@ export default function TrackingScreen() {
   };
 
   const renderLineChart = () => {
+    console.log('🔍 Line Chart Data:', {
+      totalPoints,
+      maxPoints,
+      filteredDailyPointsData: filteredDailyPointsData?.length || 0,
+      samplePoint: filteredDailyPointsData?.[0],
+      dataLimit
+    });
 
     return (
       <View style={styles.lineChartContainer}>
@@ -308,7 +347,7 @@ export default function TrackingScreen() {
                   bottom: height - 4
                 }]} />
                 <ThemedText style={styles.pointTime}>
-                  {new Date(point.time).toLocaleDateString('en-US', { 
+                  {new Date(point.date || point.time).toLocaleDateString('en-US', { 
                     month: 'short', 
                     day: 'numeric' 
                   })}
@@ -344,8 +383,8 @@ export default function TrackingScreen() {
 
   // Summary stats are now calculated in Redux selector
 
-  // Show loading state if userData is not loaded yet (following home tab pattern)
-  if (!userData?.userId) {
+  // Show loading state if user is not authenticated yet
+  if (!currentUser?.uid) {
     return (
       <ThemedView style={styles.container}>
         <ThemedText style={styles.loadingText}>Loading your tracking data...</ThemedText>
@@ -415,7 +454,7 @@ export default function TrackingScreen() {
                 <ThemedText style={styles.categoryName}>{item.category}</ThemedText>
               </View>
               <View style={styles.categoryRight}>
-                <ThemedText type="defaultSemiBold">{item.hours.toFixed(1)}h</ThemedText>
+                <ThemedText type="defaultSemiBold">{(item.hours || 0).toFixed(1)}h</ThemedText>
               </View>
             </View>
           ))
@@ -809,5 +848,9 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  barChartContainer: {
+    height: 160,
+    marginVertical: 8,
   },
 });

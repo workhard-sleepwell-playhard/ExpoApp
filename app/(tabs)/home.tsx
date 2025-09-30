@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, ScrollView, View, Alert, Animated, Dimensions, Text } from 'react-native';
+import { StyleSheet, ScrollView, View, Alert, Animated, Dimensions, Text, TouchableOpacity } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 
 // Import Redux selectors and actions
@@ -18,7 +18,9 @@ import {
   setIsPublic,
   setIsCreatePostOpen,
   setSelectedImages,
-  setSelectedVideos
+  setSelectedVideos,
+  toggleLikePost,
+  toggleDislikePost
 } from '../../store/home/home.action';
 
 // Import new components
@@ -37,6 +39,7 @@ const HomeScreen = React.memo(function HomeScreen() {
   // Redux state - Optimized to reduce re-renders
   const homeState = useSelector(selectHomeState); // Consolidated selector
   const isLoading = useSelector(selectIsLoading);
+  
   
   // Extract values from homeState to avoid multiple selectors
   const {
@@ -89,6 +92,10 @@ const HomeScreen = React.memo(function HomeScreen() {
 
   // Removed loadAllPosts - using real-time listener instead
 
+  // Debouncing to prevent spam clicking
+  const [isLiking, setIsLiking] = useState<Set<string | number>>(new Set());
+  const [isDisliking, setIsDisliking] = useState<Set<string | number>>(new Set());
+
   const handleLike = async (postId: string | number) => {
     try {
       if (!userData?.userId) {
@@ -96,21 +103,96 @@ const HomeScreen = React.memo(function HomeScreen() {
         return;
       }
 
-      await SimpleRealtimeService.likePost(postId.toString(), userData.userId);
-      
-      // Update social stats for like
-      await SimpleRealtimeService.updateSocialStats(userData.userId, 'like');
-      
-      // Add points activity
-      await SimpleRealtimeService.addPointsActivity(userData.userId, {
-        activity: 'Liked a post',
-        activityType: 'social',
-        points: 2,
-        postId: postId.toString()
-      });
+      // Prevent spam clicking
+      if (isLiking.has(postId)) {
+        return;
+      }
+
+      setIsLiking(prev => new Set(prev).add(postId));
+
+      // Instant UI update (optimistic)
+      dispatch(toggleLikePost(postId));
+
+      // Sync with Firebase in background
+      try {
+        await SimpleRealtimeService.likePost(postId.toString(), userData.userId);
+        
+        // Update social stats for like
+        await SimpleRealtimeService.updateSocialStats(userData.userId, 'like');
+        
+        // Add points activity
+        await SimpleRealtimeService.addPointsActivity(userData.userId, {
+          activity: 'Liked a post',
+          activityType: 'social',
+          points: 2,
+          postId: postId.toString()
+        });
+      } catch (error) {
+        console.error('Error syncing like with Firebase:', error);
+        // Revert UI change on error
+        dispatch(toggleLikePost(postId));
+        Alert.alert('Error', 'Failed to sync like with server. Please try again.');
+      } finally {
+        // Remove from processing set
+        setIsLiking(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(postId);
+          return newSet;
+        });
+      }
     } catch (error) {
       console.error('Error liking post:', error);
       Alert.alert('Error', 'Failed to like post. Please try again.');
+    }
+  };
+
+  const handleDislike = async (postId: string | number) => {
+    try {
+      if (!userData?.userId) {
+        Alert.alert('Please wait', 'Your profile is still loading. Please try again in a moment.');
+        return;
+      }
+
+      // Prevent spam clicking
+      if (isDisliking.has(postId)) {
+        return;
+      }
+
+      setIsDisliking(prev => new Set(prev).add(postId));
+
+      // Instant UI update (optimistic)
+      dispatch(toggleDislikePost(postId));
+
+      // Sync with Firebase in background
+      try {
+        await SimpleRealtimeService.dislikePost(postId.toString(), userData.userId);
+        
+        // Update social stats for dislike
+        await SimpleRealtimeService.updateSocialStats(userData.userId, 'dislike');
+        
+        // Add points activity (smaller points for disliking)
+        await SimpleRealtimeService.addPointsActivity(userData.userId, {
+          activity: 'Disliked a post',
+          activityType: 'social',
+          points: 1,
+          postId: postId.toString()
+        });
+      } catch (error) {
+        console.error('Error syncing dislike with Firebase:', error);
+        // Revert UI change on error
+        dispatch(toggleDislikePost(postId));
+        Alert.alert('Error', 'Failed to sync dislike with server. Please try again.');
+      } finally {
+        // Remove from processing set
+        setIsDisliking(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(postId);
+          return newSet;
+        });
+      }
+    } catch (error) {
+      console.error('Error disliking post:', error);
+      Alert.alert('Error', 'Failed to dislike post. Please try again.');
     }
   };
 
@@ -254,6 +336,7 @@ const HomeScreen = React.memo(function HomeScreen() {
             key={post.id}
             post={post}
             onLike={handleLike}
+            onDislike={handleDislike}
             onComment={handleComment}
             onShare={handleShare}
           />

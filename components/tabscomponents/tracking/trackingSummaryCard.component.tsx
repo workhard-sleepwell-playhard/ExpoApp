@@ -19,7 +19,7 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({
       <ThemedText type="subtitle" style={styles.cardTitle}>Today&apos;s Summary</ThemedText>
       <View style={styles.summaryStats}>
         <View style={styles.summaryItem}>
-          <ThemedText type="defaultSemiBold" style={styles.summaryNumber}>{totalHours.toFixed(1)}</ThemedText>
+          <ThemedText type="defaultSemiBold" style={styles.summaryNumber}>{(totalHours || 0).toFixed(1)}</ThemedText>
           <ThemedText style={styles.summaryLabel}>Total Hours</ThemedText>
         </View>
         <View style={styles.summaryItem}>

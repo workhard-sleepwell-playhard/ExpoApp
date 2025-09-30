@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle } from 'react-native';
+import { View, StyleSheet, ViewStyle, ScrollView } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
@@ -20,6 +20,9 @@ export interface BarChartProps {
   size?: 'small' | 'medium' | 'large';
   style?: ViewStyle;
   formatValue?: (value: number) => string;
+  enableHorizontalScroll?: boolean;
+  scrollThreshold?: number; // Number of items before enabling scroll
+  barWidth?: number; // Fixed width for each bar when scrolling
 }
 
 export const BarChart: React.FC<BarChartProps> = ({
@@ -32,6 +35,9 @@ export const BarChart: React.FC<BarChartProps> = ({
   size = 'medium',
   style,
   formatValue = (value) => value.toString(),
+  enableHorizontalScroll = true,
+  scrollThreshold = 7,
+  barWidth = 60,
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -71,6 +77,10 @@ export const BarChart: React.FC<BarChartProps> = ({
 
   const textSizes = getTextSizes();
 
+  // Determine if we should enable horizontal scrolling
+  const shouldScroll = enableHorizontalScroll && data.length > scrollThreshold;
+  const chartWidth = shouldScroll ? data.length * barWidth : '100%';
+
   if (data.length === 0) {
     return (
       <View style={[styles.emptyContainer, style]}>
@@ -97,44 +107,92 @@ export const BarChart: React.FC<BarChartProps> = ({
         { height: getContainerHeight() }
       ]}>
         {orientation === 'vertical' ? (
-          <View style={styles.verticalChart}>
-            {data.map((item, index) => (
-              <View key={index} style={styles.verticalBarContainer}>
-                <View style={styles.barWrapper}>
-                  {showValues && (
+          shouldScroll ? (
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={true}
+              contentContainerStyle={styles.scrollContent}
+              style={styles.scrollView}
+            >
+              <View style={[styles.verticalChart, { width: chartWidth }]}>
+                {data.map((item, index) => (
+                  <View key={index} style={[styles.verticalBarContainer, { width: barWidth }]}>
+                    <View style={styles.barWrapper}>
+                      {showValues && (
+                        <ThemedText 
+                          style={[
+                            styles.valueText,
+                            { fontSize: textSizes.value }
+                          ]}
+                        >
+                          {formatValue(item.value)}
+                        </ThemedText>
+                      )}
+                      <View 
+                        style={[
+                          styles.verticalBar,
+                          {
+                            height: `${getBarHeight(item.value)}%`,
+                            backgroundColor: item.color || Colors[colorScheme ?? 'light'].tint,
+                          }
+                        ]}
+                      />
+                    </View>
+                    {showLabels && (
+                      <ThemedText 
+                        style={[
+                          styles.labelText,
+                          { fontSize: textSizes.label }
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {item.label}
+                      </ThemedText>
+                    )}
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+          ) : (
+            <View style={styles.verticalChart}>
+              {data.map((item, index) => (
+                <View key={index} style={styles.verticalBarContainer}>
+                  <View style={styles.barWrapper}>
+                    {showValues && (
+                      <ThemedText 
+                        style={[
+                          styles.valueText,
+                          { fontSize: textSizes.value }
+                        ]}
+                      >
+                        {formatValue(item.value)}
+                      </ThemedText>
+                    )}
+                    <View 
+                      style={[
+                        styles.verticalBar,
+                        {
+                          height: `${getBarHeight(item.value)}%`,
+                          backgroundColor: item.color || Colors[colorScheme ?? 'light'].tint,
+                        }
+                      ]}
+                    />
+                  </View>
+                  {showLabels && (
                     <ThemedText 
                       style={[
-                        styles.valueText,
-                        { fontSize: textSizes.value }
+                        styles.labelText,
+                        { fontSize: textSizes.label }
                       ]}
+                      numberOfLines={1}
                     >
-                      {formatValue(item.value)}
+                      {item.label}
                     </ThemedText>
                   )}
-                  <View 
-                    style={[
-                      styles.verticalBar,
-                      {
-                        height: `${getBarHeight(item.value)}%`,
-                        backgroundColor: item.color || Colors[colorScheme ?? 'light'].tint,
-                      }
-                    ]}
-                  />
                 </View>
-                {showLabels && (
-                  <ThemedText 
-                    style={[
-                      styles.labelText,
-                      { fontSize: textSizes.label }
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {item.label}
-                  </ThemedText>
-                )}
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          )
         ) : (
           <View style={styles.horizontalChart}>
             {data.map((item, index) => (
@@ -191,6 +249,13 @@ const styles = StyleSheet.create({
   },
   chartContainer: {
     width: '100%',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    alignItems: 'flex-end',
+    paddingRight: 16,
   },
   emptyContainer: {
     padding: 20,

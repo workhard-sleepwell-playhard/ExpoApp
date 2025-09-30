@@ -170,7 +170,7 @@ export const PieChart: React.FC<PieChartProps> = ({
                           { fontSize: textSizes.value }
                         ]}
                       >
-                        ({item.percentage.toFixed(1)}%)
+                        ({(item.percentage || 0).toFixed(1)}%)
                       </ThemedText>
                     )}
                   </View>

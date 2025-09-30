@@ -23,6 +23,8 @@ class CentralizedListenerService {
       onUserTasksUpdate?: (tasks: any[]) => void;
       onLeaderboardsUpdate?: (leaderboards: any) => void;
       onTrackingDataUpdate?: (trackingData: any) => void;
+      onUserSnapshotsUpdate?: (snapshots: any[]) => void;
+      onTaskSnapshotsUpdate?: (taskSnapshots: any[]) => void;
     }
   ) {
     // Allow multiple initializations - just add new listeners if they don't exist
@@ -43,6 +45,30 @@ class CentralizedListenerService {
       this.listeners.set('userProfile', unsubscribeProfile);
     }
 
+    // Automatic snapshot listener - only set up if not already exists
+    if (userId && !this.listeners.has('automaticSnapshots')) {
+      const unsubscribeSnapshots = SimpleRealtimeService.startAutomaticSnapshotListener(userId);
+      this.listeners.set('automaticSnapshots', unsubscribeSnapshots);
+    }
+
+    // User daily snapshots listener - only set up if not already exists
+    if (callbacks.onUserSnapshotsUpdate && userId && !this.listeners.has('userSnapshots')) {
+      const unsubscribeUserSnapshots = SimpleRealtimeService.listenToUserDailySnapshots(
+        userId,
+        callbacks.onUserSnapshotsUpdate
+      );
+      this.listeners.set('userSnapshots', unsubscribeUserSnapshots);
+    }
+
+    // Task daily snapshots listener - only set up if not already exists
+    if (callbacks.onTaskSnapshotsUpdate && userId && !this.listeners.has('taskSnapshots')) {
+      const unsubscribeTaskSnapshots = SimpleRealtimeService.listenToTaskDailySnapshots(
+        userId,
+        callbacks.onTaskSnapshotsUpdate
+      );
+      this.listeners.set('taskSnapshots', unsubscribeTaskSnapshots);
+    }
+
     // User tasks listener - only set up if not already exists
     if (callbacks.onUserTasksUpdate && userId && !this.listeners.has('userTasks')) {
       const unsubscribeTasks = SimpleRealtimeService.listenToUserTasks(
@@ -60,18 +86,7 @@ class CentralizedListenerService {
       this.listeners.set('leaderboards', unsubscribeLeaderboards);
     }
 
-    // Tracking data listener - only set up if not already exists
-    if (callbacks.onTrackingDataUpdate && userId && !this.listeners.has('trackingData')) {
-      const unsubscribeTrackingData = SimpleRealtimeService.listenToOptimizedTrackingData(
-        userId,
-        {
-          recentDays: 7, // Optimize for dashboard view
-          sessionLimit: 50 // Limit recent sessions for performance
-        },
-        callbacks.onTrackingDataUpdate
-      );
-      this.listeners.set('trackingData', unsubscribeTrackingData);
-    }
+    // Tracking data listener - removed, using snapshots instead
 
     this.isInitialized = true;
   }
