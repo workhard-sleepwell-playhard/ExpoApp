@@ -13,6 +13,7 @@ import { CommentModal } from '../../components/modals/CommentModal';
 import { useCentralizedListener } from '../../hooks/use-centralized-listener';
 import { 
   openCreatePost, 
+  createPost,
   setPostContent,
   setPostType,
   setIsPublic,
@@ -265,44 +266,25 @@ const HomeScreen = React.memo(function HomeScreen() {
       const username = userData.username || `@${userData.email?.split('@')[0] || 'user'}`;
       
       const postData = {
-        userId: userData.userId,
-        userDisplayName: displayName,
-        userAvatar: avatar,
-        userUsername: username,
+        user: {
+          name: displayName,
+          avatar: avatar,
+          username: username,
+        },
         content: postContent,
-        image: selectedImages.length > 0 ? selectedImages[0] : null,
-        video: selectedVideos.length > 0 ? selectedVideos[0] : null,
+        selectedImages: selectedImages,
+        selectedVideos: selectedVideos,
         type: postType,
         isPublic,
-        likes: {},
-        comments: 0,
-        shares: 0,
       };
       
-      // Close the modal IMMEDIATELY for better UX
+      // Use Redux action which handles media upload
+      await dispatch(createPost(postData));
+      
+      // Close the modal after successful creation
       handleCloseCreatePost();
-      
-      // Show success message immediately
-      Alert.alert('Success', 'Your post has been shared to the community!');
-      
-      // Do database operations in background (non-blocking)
-      SimpleRealtimeService.createPost(postData).then(postId => {
-        // After post is created, update stats with the actual post ID
-        return Promise.all([
-          SimpleRealtimeService.updateSocialStats(userData.userId, 'post'),
-          SimpleRealtimeService.addPointsActivity(userData.userId, {
-            activity: 'Created a post',
-            activityType: 'social',
-            points: 10,
-            postId: postId
-          })
-        ]);
-      }).catch(error => {
-        console.error('Background post creation error:', error);
-        // Could show a subtle error notification here if needed
-      });
     } catch (error) {
-      console.error('Error creating post:', error);
+      console.error('❌ Error creating post:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       Alert.alert('Error', `Failed to create post: ${errorMessage}`);
     }

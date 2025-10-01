@@ -61,9 +61,11 @@ export const homeReducer = (state = HOME_INITIAL_STATE, action = {}) => {
       }
     
     case HOME_ACTION_TYPES.ADD_POST:
+      // Check if post already exists to avoid duplicates
+      const postExists = state.posts.some(p => p.id === payload.id || p.postId === payload.id);
       return {
         ...state,
-        posts: [payload, ...state.posts],
+        posts: postExists ? state.posts : [payload, ...state.posts],
       }
     
     case HOME_ACTION_TYPES.UPDATE_POST:

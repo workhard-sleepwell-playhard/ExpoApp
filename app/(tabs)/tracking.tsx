@@ -8,6 +8,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { useCentralizedListener } from '../../hooks/use-centralized-listener';
 import { BarChart } from '@/components/charts/BarChart';
+import Svg, { Circle } from 'react-native-svg';
 
 // Import Redux selectors and actions
 import { 
@@ -230,7 +231,7 @@ export default function TrackingScreen() {
         console.log('📅 Date range:', fromDate, 'to', toDate);
         
         // Process and update Redux state with snapshot data
-        dispatch(loadCustomDateRangeData(userId, fromDate, toDate));
+        dispatch(loadCustomDateRangeData());
         
         console.log('✅ Custom date range data applied to UI');
       } else {
@@ -287,13 +288,48 @@ export default function TrackingScreen() {
             <ThemedText style={styles.pieChartSubtext}>Total Tasks</ThemedText>
           </View>
           
-          {/* Pie Chart using two semicircles */}
+          {/* Pie Chart using SVG */}
           <View style={styles.pieChartSemicircle}>
-            {/* Top half - Completed (Green) */}
-            <View style={[styles.pieHalf, styles.pieTopHalf, { backgroundColor: taskCompletion[0]?.color || '#4CAF50' }]} />
-            
-            {/* Bottom half - Pending (Red/Orange) */}
-            <View style={[styles.pieHalf, styles.pieBottomHalf, { backgroundColor: taskCompletion[1]?.color || '#FF5722' }]} />
+            {(() => {
+              const completedData = taskCompletion.find((item: any) => item.category === 'Completed') || taskCompletion[0];
+              const pendingData = taskCompletion.find((item: any) => item.category === 'Pending') || taskCompletion[1];
+              
+              const completedPercentage = completedData?.percentage || 0;
+              const completedColor = completedData?.color || '#4CAF50';
+              const pendingColor = pendingData?.color || '#FF5722';
+              
+              const radius = 50; // Circle radius
+              const circumference = 2 * Math.PI * radius;
+              const strokeDashoffset = circumference * (1 - completedPercentage / 100);
+              
+              return (
+                <Svg width={120} height={120}>
+                  {/* Background circle - Pending color */}
+                  <Circle
+                    cx={60}
+                    cy={60}
+                    r={radius}
+                    stroke={pendingColor}
+                    strokeWidth={20}
+                    fill="none"
+                  />
+                  
+                  {/* Completed progress circle - Green */}
+                  <Circle
+                    cx={60}
+                    cy={60}
+                    r={radius}
+                    stroke={completedColor}
+                    strokeWidth={20}
+                    fill="none"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={strokeDashoffset}
+                    rotation="-90"
+                    origin="60, 60"
+                  />
+                </Svg>
+              );
+            })()}
           </View>
         </View>
         
@@ -625,22 +661,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-  },
-  pieHalf: {
-    width: 120,
-    height: 60,
-    position: 'absolute',
-    left: 0,
-  },
-  pieTopHalf: {
-    top: 0,
-    borderTopLeftRadius: 60,
-    borderTopRightRadius: 60,
-  },
-  pieBottomHalf: {
-    bottom: 0,
-    borderBottomLeftRadius: 60,
-    borderBottomRightRadius: 60,
   },
   pieLegend: {
     flexDirection: 'row',

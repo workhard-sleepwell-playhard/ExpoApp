@@ -243,6 +243,28 @@ export const handleTaskToggle = (taskId) => {
       // Update local state ONLY (optimistic UI)
       dispatch(toggleTask(taskId))
       
+      // Optimistically update pie chart data
+      const { tracking } = getState()
+      const completionData = tracking.taskCompletionData || []
+      
+      if (completionData.length === 2) {
+        const completed = completionData.find(d => d.category === 'Completed')
+        const pending = completionData.find(d => d.category === 'Pending')
+        
+        if (completed && pending) {
+          const delta = newCompleted ? 1 : -1
+          const total = completed.count + pending.count
+          
+          const updated = [
+            { ...completed, count: completed.count + delta, percentage: Math.round(((completed.count + delta) / total) * 100) },
+            { ...pending, count: pending.count - delta, percentage: Math.round(((pending.count - delta) / total) * 100) }
+          ]
+          
+          const { setTaskCompletionData } = require('../tracking/tracking.action')
+          dispatch(setTaskCompletionData(updated))
+        }
+      }
+      
       // Batch Firebase operations in background without triggering listeners
       // This prevents massive re-renders
       const operations = [

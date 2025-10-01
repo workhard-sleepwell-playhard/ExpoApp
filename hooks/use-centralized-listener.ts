@@ -212,8 +212,7 @@ export function useCentralizedListener(options?: {
               username: post.userUsername || '@user'
             },
             content: post.content,
-            image: post.image || null,
-            video: post.video || null,
+            media: post.media || undefined,
             type: post.type || 'general',
             isPublic: post.isPublic !== false,
             timestamp: post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'now',

@@ -1,5 +1,6 @@
 import { HOME_ACTION_TYPES } from './home.types.js'
 import { SimpleRealtimeService } from '../../src/services/simple-realtime'
+import { MediaUploadService } from '../../src/services/media-upload-service'
 
 // Helper functions for content parsing
 const extractHashtags = (content) => {
@@ -86,21 +87,30 @@ export const createPost = (postData) => {
         type: HOME_ACTION_TYPES.CREATE_POST_REQUEST 
       })
 
-      // Create post in Firebase
-      const mediaData = {};
-      
-      // Only add media fields if they have values (Firebase doesn't accept undefined)
-      if (postData.image) {
-        mediaData.images = [postData.image];
-      }
-      if (postData.video) {
-        mediaData.videos = [postData.video];
-      }
-
       // Get current user from auth state
       const currentUser = getState().auth.currentUser;
       if (!currentUser?.uid) {
         throw new Error('No authenticated user found');
+      }
+
+      // Generate post ID first (needed for storage path)
+      const tempPostId = `post_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Upload media files if present
+      const mediaUrls = await MediaUploadService.uploadPostMedia(
+        postData.selectedImages || [],
+        postData.selectedVideos || [],
+        currentUser.uid,
+        tempPostId
+      );
+
+      // Prepare media data for Firebase
+      const mediaData = {};
+      if (mediaUrls.imageUrls.length > 0) {
+        mediaData.images = mediaUrls.imageUrls;
+      }
+      if (mediaUrls.videoUrls.length > 0) {
+        mediaData.videos = mediaUrls.videoUrls;
       }
 
       // Use the user data that's already passed from the component

@@ -6,11 +6,8 @@ import { getAuth,
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged, } from 'firebase/auth';
+import { getStorage } from 'firebase/storage';
 import { SimpleRealtimeService } from '../../services/simple-realtime';
-// Note: Firestore, Storage and Functions are not needed for this app
-// import { getFirestore } from 'firebase/firestore';
-// import { getStorage } from 'firebase/storage';
-// import { getFunctions } from 'firebase/functions';
 
 // Firebase configuration
 const firebaseConfig = {
@@ -29,10 +26,7 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firebase services
 export const auth = getAuth(app);
 export const realtimeDb = getDatabase(app);
-// Note: Only using Realtime Database and Auth for this app
-// export const db = getFirestore(app); // Removed - using Realtime Database instead
-// export const storage = getStorage(app); // Not needed for this app
-// export const functions = getFunctions(app); // Not needed for this app
+export const storage = getStorage(app);
 
 // Note: Google Auth requires additional setup for React Native
 // For now, we'll disable Google Auth to prevent the window error

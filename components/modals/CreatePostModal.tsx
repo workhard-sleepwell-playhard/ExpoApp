@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, ScrollView, View, TouchableOpacity, TextInput, Animated, Dimensions } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
+import * as ImagePicker from 'expo-image-picker';
+import { MediaPickerModal } from './MediaPickerModal';
 
 // Get screen dimensions properly for Expo/React Native
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
@@ -42,20 +44,84 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   overlayOpacity,
   isLoading = false,
 }) => {
+  // Modal state
+  const [showPickerModal, setShowPickerModal] = useState(false);
+  const [pickerOptions, setPickerOptions] = useState<any>(null);
+  
+  // Helper function to pick media (camera or gallery)
+  const pickMedia = async (type: 'image' | 'video', source: 'camera' | 'gallery') => {
+    try {
+      setShowPickerModal(false); // Close picker modal
+      
+      // Request permission
+      const permission = source === 'camera' 
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (permission.status !== 'granted') {
+        // Show permission error
+        setPickerOptions({
+          title: 'Permission Needed',
+          message: `Please allow ${source} access in your device settings`,
+          options: [{ text: 'OK', onPress: () => {}, style: 'cancel' }]
+        });
+        setShowPickerModal(true);
+        return;
+      }
+
+      // Launch picker
+      const options = {
+        mediaTypes: type === 'image' ? ImagePicker.MediaTypeOptions.Images : ImagePicker.MediaTypeOptions.Videos,
+        allowsEditing: true,
+        quality: 0.8,
+        ...(type === 'video' && { videoMaxDuration: 60 }),
+      };
+
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync(options)
+        : await ImagePicker.launchImageLibraryAsync(options);
+
+      if (!result.canceled && result.assets[0]) {
+        const uri = result.assets[0].uri;
+        if (type === 'image') {
+          setSelectedImages([...selectedImages, uri]);
+        } else {
+          setSelectedVideos([...selectedVideos, uri]);
+        }
+      }
+    } catch (error) {
+      console.error('Error picking media:', error);
+    }
+  };
+
   const addImage = () => {
-    const dummyImages = ['📸', '🖼️', '📷', '🎨'];
-    const randomImage = dummyImages[Math.floor(Math.random() * dummyImages.length)];
-    setSelectedImages([...selectedImages, randomImage]);
+    setPickerOptions({
+      title: 'Add Photo',
+      message: 'Choose an option',
+      options: [
+        { text: 'Take Photo', onPress: () => pickMedia('image', 'camera') },
+        { text: 'Choose from Gallery', onPress: () => pickMedia('image', 'gallery') },
+        { text: 'Cancel', onPress: () => {}, style: 'cancel' }
+      ]
+    });
+    setShowPickerModal(true);
+  };
+
+  const addVideo = () => {
+    setPickerOptions({
+      title: 'Add Video',
+      message: 'Choose an option',
+      options: [
+        { text: 'Record Video', onPress: () => pickMedia('video', 'camera') },
+        { text: 'Choose from Gallery', onPress: () => pickMedia('video', 'gallery') },
+        { text: 'Cancel', onPress: () => {}, style: 'cancel' }
+      ]
+    });
+    setShowPickerModal(true);
   };
 
   const removeImage = (index: number) => {
     setSelectedImages(selectedImages.filter((_, i) => i !== index));
-  };
-
-  const addVideo = () => {
-    const dummyVideos = ['🎬', '📹', '🎥', '📱'];
-    const randomVideo = dummyVideos[Math.floor(Math.random() * dummyVideos.length)];
-    setSelectedVideos([...selectedVideos, randomVideo]);
   };
 
   const removeVideo = (index: number) => {
@@ -257,8 +323,18 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
           </ScrollView>
         </Animated.View>
       </View>
+      
+      {/* Media Picker Modal */}
+      {pickerOptions && (
+        <MediaPickerModal
+          visible={showPickerModal}
+          title={pickerOptions.title}
+          message={pickerOptions.message}
+          options={pickerOptions.options}
+          onClose={() => setShowPickerModal(false)}
+        />
+      )}
     </Animated.View>
-
   );
 };
 

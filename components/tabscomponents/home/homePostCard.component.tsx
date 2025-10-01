@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Image, Dimensions, ScrollView } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { DeletePostButton } from '@/components/buttons';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 interface Post {
   id: string | number;
@@ -11,8 +13,10 @@ interface Post {
     username: string;
   };
   content: string;
-  image: string | null;
-  video: string | null;
+  media?: {
+    images?: string[];
+    videos?: string[];
+  };
   timestamp: string;
   likes: number;
   dislikes: number;
@@ -35,6 +39,7 @@ interface PostCardProps {
 
 export const PostCard: React.FC<PostCardProps> = ({ post, onLike, onDislike, onComment, onShare, onDelete }) => {
   const [showDeleteButton, setShowDeleteButton] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   // Get post type configuration
   const getPostTypeConfig = (type: string) => {
@@ -127,6 +132,63 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onLike, onDislike, onC
         <View style={styles.postContentContainer}>
           <ThemedText style={styles.postContent}>{post.content}</ThemedText>
         </View>
+
+        {/* Media Container - Facebook-style */}
+        {post.media && ((post.media.images?.length ?? 0) > 0 || (post.media.videos?.length ?? 0) > 0) && (
+          <View style={styles.mediaContainer}>
+            {/* Images - Horizontal scroll if multiple */}
+            {post.media.images && post.media.images.length > 0 && (
+              <ScrollView 
+                horizontal 
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                style={styles.mediaScroll}
+                onScroll={(event) => {
+                  const offsetX = event.nativeEvent.contentOffset.x;
+                  const imageWidth = screenWidth - 24;
+                  const index = Math.round(offsetX / imageWidth);
+                  setCurrentImageIndex(index);
+                }}
+                scrollEventThrottle={16}
+              >
+                {post.media.images.map((imageUrl, index) => (
+                  <Image
+                    key={`img-${post.id}-${index}`}
+                    source={{ uri: imageUrl }}
+                    style={styles.mediaImage}
+                    resizeMode="cover"
+                  />
+                ))}
+              </ScrollView>
+            )}
+            
+            {/* Image counter for multiple images */}
+            {post.media.images && post.media.images.length > 1 && (
+              <View style={styles.imageCounter}>
+                <ThemedText style={styles.imageCounterText}>
+                  {currentImageIndex + 1}/{post.media.images.length}
+                </ThemedText>
+              </View>
+            )}
+            
+            {/* Videos - Horizontal scroll if multiple */}
+            {post.media.videos && post.media.videos.length > 0 && (
+              <ScrollView 
+                horizontal 
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                style={styles.mediaScroll}
+              >
+                {post.media.videos.map((videoUrl, index) => (
+                  <View key={`vid-${post.id}-${index}`} style={styles.videoPlaceholder}>
+                    <ThemedText style={styles.videoIcon}>▶️</ThemedText>
+                    <ThemedText style={styles.videoText}>Video</ThemedText>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        )}
 
         {/* Post Actions */}
         <View style={styles.postActions}>
@@ -350,5 +412,47 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     alignSelf: 'flex-start',
+  },
+  mediaContainer: {
+    width: '100%',
+    marginBottom: 12,
+    position: 'relative',
+  },
+  mediaScroll: {
+    width: '100%',
+  },
+  mediaImage: {
+    width: screenWidth - 24, // Full width minus post padding
+    height: screenWidth - 24, // Square aspect ratio (Facebook style)
+    backgroundColor: '#F0F0F0',
+  },
+  imageCounter: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  imageCounterText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  videoPlaceholder: {
+    width: screenWidth - 24,
+    height: screenWidth - 24,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoIcon: {
+    fontSize: 48,
+  },
+  videoText: {
+    fontSize: 14,
+    color: '#FFF',
+    marginTop: 8,
   },
 });
