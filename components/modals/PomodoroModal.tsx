@@ -29,6 +29,7 @@ import {
   selectProgress,
   selectActiveSession,
   selectDefaultDuration,
+  selectSessionDuration,
 } from '@/store/pomodoro/pomodoro.selector';
 import { selectUserId } from '@/store/auth/auth.selector';
 
@@ -58,6 +59,7 @@ export const PomodoroModal: React.FC<PomodoroModalProps> = ({ task, visible, onC
   const progress = useSelector(selectProgress);
   const activeSession = useSelector(selectActiveSession);
   const defaultDuration = useSelector(selectDefaultDuration);
+  const sessionDuration = useSelector(selectSessionDuration);
   
   // Animation
   const [slideAnim] = useState(new Animated.Value(height));
@@ -112,7 +114,7 @@ export const PomodoroModal: React.FC<PomodoroModalProps> = ({ task, visible, onC
         
         // Map 0-360 degrees to 5-60 minutes
         // 0° (top) = 5 min, 360° (full circle back to top) = 60 min
-        const duration = Math.round(5 + (degrees / 360) * 55);
+        const duration = 5 + (degrees / 360) * 55;
         const clampedDuration = Math.max(5, Math.min(60, duration));
         
         setCustomDuration(clampedDuration);
@@ -132,7 +134,7 @@ export const PomodoroModal: React.FC<PomodoroModalProps> = ({ task, visible, onC
         let degrees = ((angle * 180) / Math.PI + 90 + 360) % 360;
         
         // Map to minutes (0° = 5 min, 360° = 60 min)
-        const duration = Math.round(5 + (degrees / 360) * 55);
+        const duration = 5 + (degrees / 360) * 55;
         const clampedDuration = Math.max(5, Math.min(60, duration));
         
         if (clampedDuration !== customDuration) {
@@ -265,11 +267,14 @@ export const PomodoroModal: React.FC<PomodoroModalProps> = ({ task, visible, onC
     });
     
     try {
+      // Round duration to avoid float precision issues
+      const roundedDuration = Math.round(customDuration * 2) / 2; // Round to nearest 0.5
+      
       const result = await (dispatch as any)(startPomodoroSession(
         userId,
         task.id,
         task.title,
-        customDuration
+        roundedDuration
       ));
       console.log('✅ Session started successfully:', result);
     } catch (error: any) {
@@ -407,6 +412,18 @@ export const PomodoroModal: React.FC<PomodoroModalProps> = ({ task, visible, onC
               // Calculate stroke offset (0 = full fill, circumference = empty)
               const strokeDashoffset = circumference * (1 - percentage / 100);
               
+              // Debug logging
+              if (activeSession && timerState.timeRemaining % 5 === 0) {
+                console.log('🔵 Circle Fill Debug:', {
+                  elapsedTime: timerState.elapsedTime,
+                  sessionDuration: sessionDuration || 'NOT SET',
+                  progress: progress.toFixed(1) + '%',
+                  percentage: percentage.toFixed(1) + '%',
+                  timeRemaining: timerState.timeRemaining,
+                  shouldBe100AtElapsed: (sessionDuration * 60) + 's'
+                });
+              }
+              
               return (
                 <Svg width={300} height={300} style={styles.svgContainer}>
                   {/* Gray background circle */}
@@ -441,7 +458,7 @@ export const PomodoroModal: React.FC<PomodoroModalProps> = ({ task, visible, onC
           {/* Time Display */}
           <View style={styles.timeDisplay}>
             <Text style={styles.timeText}>
-              {activeSession ? formattedTime : `${customDuration}:00`}
+              {activeSession ? formattedTime : `${Math.round(customDuration)}:00`}
             </Text>
             <Text style={styles.statusText}>
               {timerState.sessionStatus === 'active' ? 'Focusing...' : 
@@ -469,7 +486,7 @@ export const PomodoroModal: React.FC<PomodoroModalProps> = ({ task, visible, onC
               onPress={handleStart}
             >
               <Text style={styles.buttonIcon}>🎯</Text>
-              <Text style={styles.buttonText}>Start {customDuration} min</Text>
+              <Text style={styles.buttonText}>Start {Math.round(customDuration)} min</Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.activeControls}>

@@ -40,6 +40,11 @@ export const selectDefaultDuration = createSelector(
   (pomodoro) => pomodoro.defaultDuration
 )
 
+export const selectSessionDuration = createSelector(
+  [selectPomodoroReducer],
+  (pomodoro) => pomodoro.sessionDuration
+)
+
 export const selectSelectedTask = createSelector(
   [selectPomodoroReducer],
   (pomodoro) => pomodoro.selectedTask
@@ -137,11 +142,12 @@ export const selectFormattedElapsedTime = createSelector(
 
 /**
  * Calculate progress percentage (0-100)
+ * Uses sessionDuration (locked when session starts) not defaultDuration
  */
 export const selectProgress = createSelector(
-  [selectElapsedTime, selectDefaultDuration],
-  (elapsedTime, defaultDuration) => {
-    const totalSeconds = defaultDuration * 60
+  [selectElapsedTime, selectSessionDuration],
+  (elapsedTime, sessionDuration) => {
+    const totalSeconds = sessionDuration * 60
     if (totalSeconds === 0) return 0
     return Math.min(100, (elapsedTime / totalSeconds) * 100)
   }

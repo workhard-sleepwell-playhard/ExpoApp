@@ -76,6 +76,12 @@ export const pomodoroReducer = (state = POMODORO_INITIAL_STATE, action = {}) => 
         isRunning: payload,
       }
     
+    case POMODORO_ACTION_TYPES.SET_SESSION_DURATION:
+      return {
+        ...state,
+        sessionDuration: payload,
+      }
+    
     // ========================================================================
     // Configuration Actions
     // ========================================================================
