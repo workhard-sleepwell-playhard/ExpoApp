@@ -8,6 +8,7 @@ import { trackingReducer } from './tracking/tracking.reducer.js'
 import { leaderboardsReducer } from './leaderboards/leaderboards.reducer.js'
 import { profileReducer } from './profile/profile.reducer.js'
 import { moreReducer } from './more/more.reducer.js'
+import { pomodoroReducer } from './pomodoro/pomodoro.reducer.js'
 
 export const rootReducer = combineReducers({
     auth: authReducer,
@@ -17,4 +18,5 @@ export const rootReducer = combineReducers({
     leaderboards: leaderboardsReducer,
     profile: profileReducer,
     more: moreReducer,
+    pomodoro: pomodoroReducer,
 })

@@ -99,3 +99,4 @@ The snapshot creation should work automatically whenever user data is updated th
 - `updateTaskCompletionStats()`
 - `updateSocialStats()`
 - `updateUserProfile()`
+

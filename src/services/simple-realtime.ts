@@ -1,4 +1,4 @@
-import { ref, onValue, push, set, get, query, orderByKey, limitToLast, startAt, endAt, runTransaction } from 'firebase/database';
+import { ref, onValue, push, set, get, query, orderByKey, limitToLast, startAt, endAt, runTransaction, update, remove } from 'firebase/database';
 import { realtimeDb } from '../utils/firebase/config';
 
 /**
@@ -1682,7 +1682,11 @@ export class SimpleRealtimeService {
           completedAt: taskData.completedAt || null,
           createdAt: taskData.createdAt,
           updatedAt: taskData.updatedAt,
-          snapshotTimestamp: Date.now()
+          snapshotTimestamp: Date.now(),
+          // Focus session tracking
+          completedSessions: 0,
+          interruptedSessions: 0,
+          totalSessionMinutes: 0
         };
       });
 
@@ -1722,6 +1726,68 @@ export class SimpleRealtimeService {
     } catch (error) {
       console.error('Error getting points for date:', error);
       return 0;
+    }
+  }
+
+  /**
+   * Update task daily snapshot with focus session data
+   * @param userId User ID
+   * @param taskId Task ID
+   * @param date Date string (YYYY-MM-DD)
+   */
+  static async updateTaskSnapshotWithSessions(userId: string, taskId: string, date: string): Promise<void> {
+    try {
+      const taskSnapshotRef = ref(realtimeDb, `taskDailySnapshots/${userId}/${date}/${taskId}`);
+      const snapshotData = await get(taskSnapshotRef);
+      
+      // If snapshot doesn't exist, skip update
+      if (!snapshotData.exists()) {
+        console.log('Task snapshot does not exist yet for:', taskId, date);
+        return;
+      }
+      
+      // Get all focus sessions for this task on this date
+      const sessionsRef = ref(realtimeDb, 'focusSessionSnapshots');
+      const sessionsSnapshot = await get(sessionsRef);
+      
+      if (!sessionsSnapshot.exists()) {
+        return;
+      }
+      
+      const allSessions = sessionsSnapshot.val();
+      const taskSessions = Object.values(allSessions).filter((session: any) => 
+        session.userId === userId &&
+        session.taskId === taskId &&
+        session.date === date
+      );
+      
+      // Calculate session statistics
+      let completedSessions = 0;
+      let interruptedSessions = 0;
+      let totalSessionMinutes = 0;
+      
+      taskSessions.forEach((session: any) => {
+        if (session.status === 'completed') {
+          completedSessions++;
+          totalSessionMinutes += session.durationMinutes || 0;
+        } else if (session.status === 'interrupted') {
+          interruptedSessions++;
+          totalSessionMinutes += session.durationMinutes || 0;
+        }
+        // Note: cancelled sessions are not counted
+      });
+      
+      // Update the task snapshot
+      await update(taskSnapshotRef, {
+        completedSessions,
+        interruptedSessions,
+        totalSessionMinutes,
+        updatedAt: new Date().toISOString()
+      });
+      
+      console.log(`Updated task snapshot ${taskId} for ${date} - Sessions: ${completedSessions} completed, ${interruptedSessions} interrupted, ${totalSessionMinutes} minutes`);
+    } catch (error) {
+      console.error('Error updating task snapshot with sessions:', error);
     }
   }
 
@@ -1786,11 +1852,11 @@ export class SimpleRealtimeService {
       } else {
         snapshot = await get(taskSnapshotsRef);
       }
-      const data = snapshot.val();
+        const data = snapshot.val();
       
       console.log(`📊 Raw task snapshots data:`, data);
-      
-      if (!data) {
+        
+        if (!data) {
         console.log('📊 No task snapshots data found');
         return [];
       }
@@ -1811,7 +1877,7 @@ export class SimpleRealtimeService {
 
       console.log(`📊 Processed ${snapshots.length} task snapshots`);
       return snapshots.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-    } catch (error) {
+      } catch (error) {
       console.error('Error getting task daily snapshots:', error);
       return [];
     }

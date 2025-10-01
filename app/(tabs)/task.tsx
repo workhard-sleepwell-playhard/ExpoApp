@@ -38,6 +38,7 @@ import { TaskHeader } from '../../components/tabscomponents/task/taskHeader.comp
 import { TaskStats } from '../../components/tabscomponents/task/taskStats.component';
 import { TaskCard } from '../../components/tabscomponents/task/taskCard.component';
 import { CreateTaskModal } from '@/components/modals/CreateTaskModal';
+import { PomodoroModal } from '@/components/modals/PomodoroModal';
 import { Colors } from '@/constants/theme';
 
 const { height: screenHeight } = Dimensions.get('window');
@@ -90,6 +91,10 @@ const TaskScreen = React.memo(function TaskScreen() {
   // Edit mode state
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
+  
+  // Pomodoro modal state
+  const [showPomodoroModal, setShowPomodoroModal] = useState(false);
+  const [pomodoroTask, setPomodoroTask] = useState<any>(null);
   
   // Cleanup animations on unmount
   React.useEffect(() => {
@@ -303,8 +308,19 @@ const TaskScreen = React.memo(function TaskScreen() {
     );
   };
 
-  const handleOpenProductivityFeatures = () => {
-    dispatch(openProductivityFeatures());
+  const handleOpenProductivityFeatures = (task?: any) => {
+    // If a task is passed, use it, otherwise use selectedTask
+    const taskToUse = task || selectedTask;
+    if (taskToUse) {
+      // Always update the task - modal will handle active session check
+      setPomodoroTask(taskToUse);
+      setShowPomodoroModal(true);
+    }
+  };
+  
+  const handleClosePomodoroModal = () => {
+    setShowPomodoroModal(false);
+    setPomodoroTask(null);
   };
 
   // handleCloseProductivityFeatures removed - not used in UI
@@ -326,14 +342,14 @@ const TaskScreen = React.memo(function TaskScreen() {
             paddingVertical: containerPadding,
           }]}>
             <ThemedText style={styles.sectionTitle}>Current Focus</ThemedText>
-            <TaskCard
+            <TaskCard 
               task={selectedTask}
               isMainTask={true}
               onToggle={onTaskToggle}
               onSelect={onTaskSelect}
               onDelete={handleDeleteTask}
               onEdit={handleEditTaskClick}
-              onProductivity={handleOpenProductivityFeatures}
+              onProductivity={() => handleOpenProductivityFeatures(selectedTask)}
               getPriorityColor={getPriorityColor}
             />
           </Animated.View>
@@ -354,7 +370,7 @@ const TaskScreen = React.memo(function TaskScreen() {
         {showOtherTasks && (
           <>
             {otherTasks.map((task: any) => (
-              <TaskCard
+              <TaskCard 
                 key={task.id}
                 task={task}
                 isMainTask={false}
@@ -362,7 +378,7 @@ const TaskScreen = React.memo(function TaskScreen() {
                 onSelect={onTaskSelect}
                 onDelete={handleDeleteTask}
                 onEdit={handleEditTaskClick}
-                onProductivity={handleOpenProductivityFeatures}
+                onProductivity={() => handleOpenProductivityFeatures(task)}
                 getPriorityColor={getPriorityColor}
               />
             ))}
@@ -399,6 +415,13 @@ const TaskScreen = React.memo(function TaskScreen() {
         setNewTag={(tag) => dispatch(setNewTag(tag))}
         onAddTag={addTag}
         onRemoveTag={removeTag}
+      />
+      
+      {/* Pomodoro Focus Timer Modal */}
+      <PomodoroModal
+        task={pomodoroTask}
+        visible={showPomodoroModal}
+        onClose={handleClosePomodoroModal}
       />
     </>
   );
