@@ -46,7 +46,7 @@ const ProfileScreen = React.memo(function ProfileScreen() {
   const colorScheme = useColorScheme();
   
   // Auth context - now available in any tab!
-  const { isAuthenticated, isLoading: authLoading, currentUser } = useAuth();
+  const { currentUser } = useAuth();
   
   // Confirmation modal state
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
@@ -63,7 +63,6 @@ const ProfileScreen = React.memo(function ProfileScreen() {
   const {
     notificationsEnabled,
     name: userName,
-    email: userEmail,
     avatar: userAvatar,
     joinDate: userJoinDate,
     totalTasks,
@@ -191,25 +190,13 @@ const ProfileScreen = React.memo(function ProfileScreen() {
         onMyPosts={onMyPosts}
       />
       
-      {/* Auth State Display - Demo of auth context access */}
-      <ThemedView style={styles.authStateCard}>
-        <ThemedText type="subtitle" style={styles.cardTitle}>Auth State (Demo)</ThemedText>
-        <ThemedText style={styles.authStateText}>
-          Authenticated: {isAuthenticated ? '✅ Yes' : '❌ No'}
-        </ThemedText>
-        <ThemedText style={styles.authStateText}>
-          Auth Loading: {authLoading ? '⏳ Yes' : '✅ No'}
-        </ThemedText>
-        <ThemedText style={styles.authStateText}>
-          User: {currentUser ? currentUser.email || 'Logged in' : 'Not logged in'}
-        </ThemedText>
-      </ThemedView>
-      
       <ProfileCard 
         name={userName}
-        avatar={userAvatar}
+        avatar={userData?.avatarData || userAvatar}
         onCollectionPress={onCollectionPress}
         onEditAvatar={onEditAvatar}
+        userId={currentUser?.uid || ''}
+        avatar3DUrl={undefined} // Will be generated via RPM API
       />
       <StatsCard 
         totalTasks={totalTasks}
@@ -337,13 +324,6 @@ const ProfileScreen = React.memo(function ProfileScreen() {
 
               {/* User Info Section */}
               <View style={styles.userInfoSection}>
-                <View style={styles.userInfoItem}>
-                  <IconSymbol name="envelope.fill" size={20} color="#007AFF" />
-                  <View style={styles.userInfoText}>
-                    <ThemedText style={styles.userInfoLabel}>Email</ThemedText>
-                    <ThemedText style={styles.userInfoValue}>{userEmail}</ThemedText>
-                  </View>
-                </View>
                 
                 <View style={styles.userInfoItem}>
                   <IconSymbol name="clock.fill" size={20} color="#007AFF" />
@@ -661,20 +641,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
-  },
-  // Auth State Demo Styles
-  authStateCard: {
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: '#F8F9FA',
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-  },
-  authStateText: {
-    fontSize: 14,
-    marginVertical: 2,
-    color: '#495057',
   },
   // Loading and Error States
   loadingContainer: {

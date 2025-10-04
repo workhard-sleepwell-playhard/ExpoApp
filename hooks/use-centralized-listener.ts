@@ -13,6 +13,7 @@ import { setTasks } from '../store/task/task.action';
 import { setRankings } from '../store/leaderboards/leaderboards.action';
 import { loadTrackingData, setWeeklyProgressData, setTaskCompletionData, setDailyPointsData, setCategoriesData, loadCustomDateRangeTaskSnapshotData } from '../store/tracking/tracking.action';
 import { SimpleRealtimeService } from '../src/services/simple-realtime';
+import { avatarService, AvatarData } from '../src/services/avatar-service';
 
 /**
  * Generate tracking data from user data changes (updates Redux tracking state)
@@ -208,7 +209,9 @@ export function useCentralizedListener(options?: {
             userId: post.userId,
             user: {
               name: post.userDisplayName || 'User',
-              avatar: post.userAvatar || '👤',
+              avatar: (post.userAvatar && typeof post.userAvatar === 'object' && post.userAvatar.value) 
+                ? post.userAvatar.value 
+                : (typeof post.userAvatar === 'string' ? post.userAvatar : '👤'),
               username: post.userUsername || '@user'
             },
             content: post.content,
@@ -228,8 +231,18 @@ export function useCentralizedListener(options?: {
         dispatch(setPosts(transformedPosts));
       } : undefined,
 
-      onUserProfileUpdate: enableUserData ? (userData) => {
+      onUserProfileUpdate: enableUserData ? async (userData) => {
         if (userData) {
+          // Get avatar data if avatarId exists
+          let avatarData: AvatarData | null = null;
+          if (userData.avatarId) {
+            try {
+              avatarData = await avatarService.getAvatar(userData.avatarId);
+            } catch (error) {
+              console.error('Error fetching avatar:', error);
+            }
+          }
+
           // Single user data object with all profile and points data
           const completeUserData = {
             // Profile data
@@ -238,7 +251,11 @@ export function useCentralizedListener(options?: {
             email: userData.email || '',
             displayName: userData.displayName || '',
             username: userData.username || '',
-            avatar: userData.avatar || '👤',
+            avatar: avatarData || (userData.avatar && typeof userData.avatar === 'object' && userData.avatar.value) 
+              ? userData.avatar.value 
+              : (typeof userData.avatar === 'string' ? userData.avatar : '👤'),
+            avatarId: userData.avatarId || null,
+            avatarData: avatarData, // Include full avatar data
             bio: userData.bio || '',
             joinDate: userData.createdAt ? new Date(userData.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long' }) : 'Unknown',
             
@@ -299,7 +316,9 @@ export function useCentralizedListener(options?: {
             userId: user.userId || user.id || '',
             name: user.displayName || user.name || 'User',
             email: user.email || '',
-            avatar: user.avatar || '👤',
+            avatar: (user.avatar && typeof user.avatar === 'object' && user.avatar.value) 
+              ? user.avatar.value 
+              : (typeof user.avatar === 'string' ? user.avatar : '👤'),
             totalPoints: user.totalPoints || 0,
             weeklyPoints: user.weeklyPoints || 0,
             currentStreak: user.currentStreak || 0,

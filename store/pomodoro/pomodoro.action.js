@@ -30,11 +30,6 @@ export const setIsRunning = (isRunning) => ({
   payload: isRunning
 })
 
-export const setSessionDuration = (duration) => ({
-  type: POMODORO_ACTION_TYPES.SET_SESSION_DURATION,
-  payload: duration
-})
-
 // ============================================================================
 // Configuration Actions
 // ============================================================================
@@ -384,7 +379,6 @@ export const startPomodoroSession = (userId, taskId, taskName, durationMinutes =
       const sessionId = await dispatch(startSession(userId, taskId, taskName))
       
       // Initialize timer state
-      dispatch(setSessionDuration(durationMinutes)) // Store session duration
       dispatch(setTimeRemaining(durationMinutes * 60))
       dispatch(setElapsedTime(0))
       dispatch(setIsRunning(true))
@@ -410,7 +404,6 @@ export const completePomodoroSession = (sessionId, status = 'completed') => {
       dispatch(setIsRunning(false))
       dispatch(setTimeRemaining(0))
       dispatch(setElapsedTime(0))
-      dispatch(setSessionDuration(0)) // Reset session duration
       
       return true
     } catch (error) {

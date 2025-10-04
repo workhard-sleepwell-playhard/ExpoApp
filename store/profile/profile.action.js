@@ -1,5 +1,6 @@
 import { PROFILE_ACTION_TYPES } from './profile.types.js'
 import { SimpleRealtimeService } from '../../src/services/simple-realtime'
+import { avatarService } from '../../src/services/avatar-service'
 
 export const setUserData = (data) => ({
   type: PROFILE_ACTION_TYPES.SET_USER_DATA,
@@ -524,6 +525,117 @@ export const listenToUserStats = (uid) => {
       console.error('Error setting up user stats listener:', error);
       dispatch({ 
         type: PROFILE_ACTION_TYPES.FETCH_USER_PROFILE_FAILED,
+        payload: error.message
+      });
+    }
+  };
+};
+
+// Avatar-specific actions
+export const createAvatar = (userId, customLayers) => {
+  return async (dispatch) => {
+    try {
+      dispatch({ type: PROFILE_ACTION_TYPES.UPDATE_USER_PROFILE_START });
+      
+      const avatarData = await avatarService.createAvatar(userId, customLayers);
+      
+      // Update user's avatarId in Firebase
+      await SimpleRealtimeService.updateUserProfile(userId, {
+        avatarId: avatarData.avatarId,
+        updatedAt: Date.now()
+      });
+      
+      // Update Redux with avatar data
+      dispatch({ 
+        type: PROFILE_ACTION_TYPES.UPDATE_USER_PROFILE_SUCCESS,
+        payload: { 
+          avatarId: avatarData.avatarId,
+          avatarData: avatarData 
+        }
+      });
+      
+      console.log('✅ Avatar created and linked to user');
+    } catch (error) {
+      console.error('❌ Error creating avatar:', error);
+      dispatch({ 
+        type: PROFILE_ACTION_TYPES.UPDATE_USER_PROFILE_FAILED,
+        payload: error.message
+      });
+    }
+  };
+};
+
+export const updateAvatarLayer = (avatarId, layerType, layerData) => {
+  return async (dispatch) => {
+    try {
+      dispatch({ type: PROFILE_ACTION_TYPES.UPDATE_USER_PROFILE_START });
+      
+      await avatarService.updateLayer(avatarId, layerType, layerData);
+      
+      // Get updated avatar data
+      const updatedAvatar = await avatarService.getAvatar(avatarId);
+      
+      // Update Redux
+      dispatch({ 
+        type: PROFILE_ACTION_TYPES.UPDATE_USER_PROFILE_SUCCESS,
+        payload: { avatarData: updatedAvatar }
+      });
+      
+      console.log(`✅ Avatar ${layerType} updated`);
+    } catch (error) {
+      console.error(`❌ Error updating avatar ${layerType}:`, error);
+      dispatch({ 
+        type: PROFILE_ACTION_TYPES.UPDATE_USER_PROFILE_FAILED,
+        payload: error.message
+      });
+    }
+  };
+};
+
+export const updateAvatarLayers = (avatarId, layers) => {
+  return async (dispatch) => {
+    try {
+      dispatch({ type: PROFILE_ACTION_TYPES.UPDATE_USER_PROFILE_START });
+      
+      await avatarService.updateAvatarLayers(avatarId, layers);
+      
+      // Get updated avatar data
+      const updatedAvatar = await avatarService.getAvatar(avatarId);
+      
+      // Update Redux
+      dispatch({ 
+        type: PROFILE_ACTION_TYPES.UPDATE_USER_PROFILE_SUCCESS,
+        payload: { avatarData: updatedAvatar }
+      });
+      
+      console.log('✅ Avatar layers updated');
+    } catch (error) {
+      console.error('❌ Error updating avatar layers:', error);
+      dispatch({ 
+        type: PROFILE_ACTION_TYPES.UPDATE_USER_PROFILE_FAILED,
+        payload: error.message
+      });
+    }
+  };
+};
+
+export const listenToAvatar = (avatarId) => {
+  return async (dispatch) => {
+    try {
+      const unsubscribe = avatarService.listenToAvatar(avatarId, (avatarData) => {
+        if (avatarData) {
+          dispatch({ 
+            type: PROFILE_ACTION_TYPES.UPDATE_USER_PROFILE_SUCCESS,
+            payload: { avatarData }
+          });
+        }
+      });
+      
+      return unsubscribe;
+    } catch (error) {
+      console.error('❌ Error setting up avatar listener:', error);
+      dispatch({ 
+        type: PROFILE_ACTION_TYPES.UPDATE_USER_PROFILE_FAILED,
         payload: error.message
       });
     }

@@ -10,6 +10,8 @@ export const PROFILE_INITIAL_STATE = {
     displayName: '',
     username: '',
     avatar: '👤',
+    avatarId: null,
+    avatarData: null,
     bio: '',
     joinDate: '',
     
