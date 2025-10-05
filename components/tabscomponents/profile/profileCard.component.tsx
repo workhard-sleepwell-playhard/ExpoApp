@@ -91,7 +91,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({
           <Avatar3DRenderer
             avatarUrl={rpmAvatarUrl}
             accessToken={rpmAvatarResponse?.accessToken} // Pass access token
-            size={200}
+            size={300}
             showBackground={true}
             isLoading={isGeneratingAvatar}
             onLoadComplete={() => console.log('3D Avatar loaded successfully')}
@@ -140,10 +140,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.02)',
     alignItems: 'center',
   },
-  avatarContainer: {
-    position: 'relative',
-    marginBottom: 16,
-  },
+      avatarContainer: {
+        position: 'relative',
+        marginBottom: 16,
+        width: 300,
+        height: 300,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 3,
+        borderColor: '#007AFF',
+        borderRadius: 150,
+        backgroundColor: '#F0F8FF',
+      },
   avatar: {
     width: 200,
     height: 200,

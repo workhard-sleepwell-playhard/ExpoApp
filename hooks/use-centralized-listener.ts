@@ -324,7 +324,7 @@ export function useCentralizedListener(options?: {
             currentStreak: user.currentStreak || 0,
             bestStreak: user.bestStreak || 0,
             isCurrentUser: false, // Will be set by component logic
-            ...user // Keep any other properties
+            // Don't spread ...user to avoid Firebase server timestamp objects
           }));
 
           const rankings = {

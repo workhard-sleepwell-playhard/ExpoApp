@@ -43,3 +43,4 @@ The service will:
 2. Get the avatar ID from response
 3. Construct GLB URL: `https://models.readyplayer.me/{avatarId}.glb`
 4. Load the 3D model in the Avatar3DRenderer
+
